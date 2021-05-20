@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reference-addon
+  namespace: reference-addon
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: reference-addon
+  namespace: reference-addon
+rules:
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: reference-addon
+  namespace: reference-addon
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: reference-addon
+subjects:
+- kind: ServiceAccount
+  name: reference-addon
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: reference-addon
+rules:
+# - apiGroups:
+#   - "addons.managed.openshift.io"
+#   resources:
+#   - addons
+#   - addons/status
+#   - addons/finalizers
+#   verbs:
+#   - get
+#   - list
+#   - watch
+#   - update
+#   - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: reference-addon
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: reference-addon
+subjects:
+- kind: ServiceAccount
+  name: reference-addon
+  namespace: reference-addon

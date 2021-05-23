@@ -157,7 +157,7 @@ dependencies: \
 # Run against the configured Kubernetes cluster in ~/.kube/config or $KUBECONFIG
 run: generate fmt vet manifests
 	go run -ldflags "-w $(LD_FLAGS)" \
-		./cmd/reference-addon/main.go \
+		./cmd/reference-addon-manager/main.go \
 			-pprof-addr="127.0.0.1:8065"
 .PHONY: run
 

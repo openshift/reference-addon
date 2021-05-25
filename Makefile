@@ -217,30 +217,30 @@ setup-e2e-kind: | \
 create-kind-cluster: $(KIND)
 	@echo "creating kind cluster reference-addon-e2e..."
 	@mkdir -p .cache/e2e
-	@(source hack/determine-container-runtime.sh \
-		&& $$KIND_COMMAND create cluster \
+	@(source hack/determine-container-runtime.sh; \
+		$$KIND_COMMAND create cluster \
 			--kubeconfig="$(KIND_KUBECONFIG)" \
-			--name="reference-addon-e2e" \
-		&& if [[ ! -O "$(KIND_KUBECONFIG)" ]]; then \
-				sudo chown $$USER: "$(KIND_KUBECONFIG)"; \
-			fi \
-		&& echo) 2>&1 | sed 's/^/  /'
+			--name="reference-addon-e2e"; \
+		if [[ ! -O "$(KIND_KUBECONFIG)" ]]; then \
+			sudo chown $$USER: "$(KIND_KUBECONFIG)"; \
+		fi; \
+		echo) 2>&1 | sed 's/^/  /'
 .PHONY: create-kind-cluster
 
 delete-kind-cluster: $(KIND)
 	@echo "deleting kind cluster reference-addon-e2e..."
-	@(source hack/determine-container-runtime.sh \
-		&& $$KIND_COMMAND delete cluster \
+	@(source hack/determine-container-runtime.sh; \
+		$$KIND_COMMAND delete cluster \
 			--kubeconfig="$(KIND_KUBECONFIG)" \
-			--name "reference-addon-e2e" \
-		&& rm -rf "$(KIND_KUBECONFIG)" \
-		&& echo) 2>&1 | sed 's/^/  /'
+			--name "reference-addon-e2e"; \
+		rm -rf "$(KIND_KUBECONFIG)"; \
+		echo) 2>&1 | sed 's/^/  /'
 .PHONY: delete-kind-cluster
 
 # Load Addon Operator Image into kind
 load-reference-addon: build-image-reference-addon-manager
-	@source hack/determine-container-runtime.sh \
-		&& $$KIND_COMMAND load image-archive \
+	@source hack/determine-container-runtime.sh; \
+		$$KIND_COMMAND load image-archive \
 			.cache/image/reference-addon-manager.tar \
 			--name reference-addon-e2e
 .PHONY: load-reference-addon
@@ -248,18 +248,17 @@ load-reference-addon: build-image-reference-addon-manager
 # Template deployment
 config/deploy/deployment.yaml: FORCE $(YQ)
 	@yq eval '.spec.template.spec.containers[0].image = "$(REFERENCE_ADDON_MANAGER_IMAGE)"' \
-			config/deploy/deployment.yaml.tpl > config/deploy/deployment.yaml
+		config/deploy/deployment.yaml.tpl > config/deploy/deployment.yaml
 
 # Installs the Addon Operator into the kind e2e cluster.
 apply-reference-addon: $(YQ) load-reference-addon config/deploy/deployment.yaml
 	@echo "installing Addon Operator $(VERSION)..."
-	@(source hack/determine-container-runtime.sh \
-		&& kubectl apply -f config/deploy \
-		&& echo -e "\nwaiting for deployment/reference-addon..." \
-		&& kubectl wait --for=condition=available deployment/reference-addon -n reference-addon --timeout=240s \
-		&& echo) 2>&1 | sed 's/^/  /'
+	@(source hack/determine-container-runtime.sh; \
+		kubectl apply -f config/deploy; \
+		echo -e "\nwaiting for deployment/reference-addon..."; \
+		kubectl wait --for=condition=available deployment/reference-addon -n reference-addon --timeout=240s; \
+		echo) 2>&1 | sed 's/^/  /'
 .PHONY: apply-reference-addon
-
 
 # ----------------
 # Container Images
@@ -276,20 +275,20 @@ push-images: \
 .SECONDEXPANSION:
 build-image-%: bin/linux_amd64/$$*
 	@echo "building image ${IMAGE_ORG}/$*:${VERSION}..."
-	@(source hack/determine-container-runtime.sh \
-		&& rm -rf ".cache/image/$*" ".cache/image/$*.tar" \
-		&& mkdir -p ".cache/image/$*" \
-		&& cp -a "bin/linux_amd64/$*" ".cache/image/$*" \
-		&& cp -a "config/docker/$*.Dockerfile" ".cache/image/$*/Dockerfile" \
-		&& cp -a "config/docker/passwd" ".cache/image/$*/passwd" \
-		&& echo "building ${IMAGE_ORG}/$*:${VERSION}" \
-		&& $$CONTAINER_COMMAND build -t "${IMAGE_ORG}/$*:${VERSION}" ".cache/image/$*" \
-		&& $$CONTAINER_COMMAND image save -o ".cache/image/$*.tar" "${IMAGE_ORG}/$*:${VERSION}" \
-		&& echo) 2>&1 | sed 's/^/  /'
+	@(source hack/determine-container-runtime.sh; \
+		rm -rf ".cache/image/$*" ".cache/image/$*.tar"; \
+		mkdir -p ".cache/image/$*"; \
+		cp -a "bin/linux_amd64/$*" ".cache/image/$*"; \
+		cp -a "config/docker/$*.Dockerfile" ".cache/image/$*/Dockerfile"; \
+		cp -a "config/docker/passwd" ".cache/image/$*/passwd"; \
+		echo "building ${IMAGE_ORG}/$*:${VERSION}"; \
+		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/$*:${VERSION}" ".cache/image/$*"; \
+		$$CONTAINER_COMMAND image save -o ".cache/image/$*.tar" "${IMAGE_ORG}/$*:${VERSION}"; \
+		echo) 2>&1 | sed 's/^/  /'
 
 push-image-%: build-image-$$*
 	@echo "pushing image ${IMAGE_ORG}/$*:${VERSION}..."
-	@(source hack/determine-container-runtime.sh \
-		&& $$CONTAINER_COMMAND push "${IMAGE_ORG}/$*:${VERSION}" \
-		&& echo pushed "${IMAGE_ORG}/$*:${VERSION}" \
-		&& echo) 2>&1 | sed 's/^/  /'
+	@(source hack/determine-container-runtime.sh; \
+		$$CONTAINER_COMMAND push "${IMAGE_ORG}/$*:${VERSION}"; \
+		echo pushed "${IMAGE_ORG}/$*:${VERSION}"; \
+		echo) 2>&1 | sed 's/^/  /'

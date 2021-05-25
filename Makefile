@@ -32,8 +32,6 @@ export PATH:=$(GOBIN):$(PATH)
 KIND_KUBECONFIG:=.cache/e2e/kubeconfig
 export KUBECONFIG?=$(abspath $(KIND_KUBECONFIG))
 export GOLANGCI_LINT_CACHE=$(abspath .cache/golangci-lint)
-API_BASE:=reference.addons.managed.openshift.io
-export SKIP_TEARDOWN?=
 
 # Container
 IMAGE_ORG?=quay.io/app-sre
@@ -48,7 +46,7 @@ all: \
 
 bin/linux_amd64/%: GOARGS = GOOS=linux GOARCH=amd64
 
-bin/%: generate manifests FORCE
+bin/%: generate FORCE
 	$(eval COMPONENT=$(shell basename $*))
 	@echo -e -n "compiling cmd/$(COMPONENT)...\n  "
 	$(GOARGS) go build -ldflags "-w $(LD_FLAGS)" -o bin/$* cmd/$(COMPONENT)/main.go
@@ -151,11 +149,11 @@ dependencies: \
 .PHONY: dependencies
 
 # ----------
-# Deployment
+# Development
 # ----------
 
 # Run against the configured Kubernetes cluster in ~/.kube/config or $KUBECONFIG
-run: generate fmt vet manifests
+run: generate
 	go run -ldflags "-w $(LD_FLAGS)" \
 		./cmd/reference-addon-manager/main.go \
 			-pprof-addr="127.0.0.1:8065"
@@ -165,55 +163,31 @@ run: generate fmt vet manifests
 # Generators
 # ----------
 
-# Generate manifests e.g. CRD, RBAC etc.
-manifests: $(CONTROLLER_GEN)
+# Generate code and manifests e.g. CRD, RBAC etc.
+generate: $(CONTROLLER_GEN)
 	@echo "generating kubernetes manifests..."
 	@controller-gen crd:crdVersions=v1 \
 		rbac:roleName=reference-addon \
 		paths="./..." \
 		output:crd:artifacts:config=config/deploy 2>&1 | sed 's/^/  /'
 	@echo
-
-# Generate code
-generate: $(CONTROLLER_GEN)
 	@echo "generating code..."
 	@controller-gen object paths=./apis/... 2>&1 | sed 's/^/  /'
 	@echo
-
-# Makes sandwich
-# https://xkcd.com/149/
-sandwich:
-ifneq ($(shell id -u), 0)
-	@echo "What? Make it yourself."
-else
-	@echo "Okay."
-endif
 
 # -------------------
 # Testing and Linting
 # -------------------
 
-pre-commit-install: $(GOIMPORTS)
-	@echo "installing pre-commit hooks using https://pre-commit.com/"
-	@pre-commit install
-.PHONY: pre-commit-install
-
-fmt:
-	go fmt ./...
-.PHONY: fmt
-
-vet:
-	go vet ./...
-.PHONY: vet
-
 # Runs code-generators, checks for clean directory and lints the source code.
-lint: generate fmt vet manifests $(GOLANGCI_LINT)
-	@hack/validate-directory-clean.sh
+lint: generate $(GOLANGCI_LINT)
+	go fmt ./...
 	golangci-lint run ./... --deadline=15m
+	@hack/validate-directory-clean.sh
 .PHONY: lint
 
 # Runs unittests
-test-unit: generate fmt vet manifests
+test-unit: generate
 	CGO_ENABLED=1 go test -race -v ./internal/... ./cmd/...
 .PHONY: test-unit
 
@@ -232,7 +206,7 @@ test-e2e-local: | setup-e2e-kind test-e2e
 .PHONY: test-e2e-local
 
 # Run the E2E testsuite after installing the Reference Addon into the cluster.
-test-e2e-ci: | apply-ao test-e2e
+test-e2e-ci: | apply-reference-addon test-e2e
 
 # make sure that we install our components into the kind cluster and disregard normal $KUBECONFIG
 setup-e2e-kind: export KUBECONFIG=$(abspath $(KIND_KUBECONFIG))
@@ -245,9 +219,11 @@ create-kind-cluster: $(KIND)
 	@mkdir -p .cache/e2e
 	@(source hack/determine-container-runtime.sh \
 		&& $$KIND_COMMAND create cluster \
-			--kubeconfig=$(KIND_KUBECONFIG) \
+			--kubeconfig="$(KIND_KUBECONFIG)" \
 			--name="reference-addon-e2e" \
-		&& sudo chown $$USER: $(KIND_KUBECONFIG) \
+		&& if [[ ! -O "$(KIND_KUBECONFIG)" ]]; then \
+				sudo chown $$USER: "$(KIND_KUBECONFIG)"; \
+			fi \
 		&& echo) 2>&1 | sed 's/^/  /'
 .PHONY: create-kind-cluster
 
@@ -284,11 +260,6 @@ apply-reference-addon: $(YQ) load-reference-addon config/deploy/deployment.yaml
 		&& echo) 2>&1 | sed 's/^/  /'
 .PHONY: apply-reference-addon
 
-apply-reference-addon-crds-only: manifests
-	@for file in $(shell find config -name '$(API_BASE)_*.yaml'); do \
-		kubectl apply -f "$$file"; \
-	done
-.PHONY: apply-reference-addon-crds-only
 
 # ----------------
 # Container Images

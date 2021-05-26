@@ -5,4 +5,4 @@ set -euo pipefail
 # and then executes goimport passing all arguments forward
 
 make -s goimports
-.cache/dependencies/bin/goimports -local github.com/mt-sre/reference-addon -w -l "$@"
+.cache/dependencies/bin/goimports -local github.com/openshift/reference-addon -w -l "$@"

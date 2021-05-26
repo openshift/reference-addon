@@ -1,4 +1,4 @@
-module github.com/mt-sre/reference-addon
+module github.com/openshift/reference-addon
 
 go 1.16
 

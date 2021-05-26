@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mt-sre/reference-addon/e2e"
+	"github.com/openshift/reference-addon/e2e"
 )
 
 func Teardown(t *testing.T) {

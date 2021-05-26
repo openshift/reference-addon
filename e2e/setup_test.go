@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/mt-sre/reference-addon/e2e"
+	"github.com/openshift/reference-addon/e2e"
 )
 
 func Setup(t *testing.T) {

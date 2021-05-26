@@ -14,7 +14,7 @@ BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 SHORT_SHA=$(shell git rev-parse --short HEAD)
 VERSION?=$(shell echo ${BRANCH} | tr / -)-${SHORT_SHA}
 BUILD_DATE=$(shell date +%s)
-MODULE:=github.com/mt-sre/addon-operator
+MODULE:=github.com/openshift/reference-addon
 LD_FLAGS=-X $(MODULE)/internal/version.Version=$(VERSION) \
 			-X $(MODULE)/internal/version.Branch=$(BRANCH) \
 			-X $(MODULE)/internal/version.Commit=$(SHORT_SHA) \

@@ -3,7 +3,7 @@ package reference
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/mt-sre/reference-addon/apis/reference/v1alpha1"
+	"github.com/openshift/reference-addon/apis/reference/v1alpha1"
 )
 
 // AddToSchemes may be used to add all resources defined in the project to a Scheme

@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	refapis "github.com/mt-sre/reference-addon/apis"
-	// "github.com/mt-sre/reference-addon/internal/controllers"
+	refapis "github.com/openshift/reference-addon/apis"
+	// "github.com/openshift/reference-addon/internal/controllers"
 )
 
 var (

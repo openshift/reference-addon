@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	refapis "github.com/mt-sre/reference-addon/apis"
+	refapis "github.com/openshift/reference-addon/apis"
 )
 
 const (

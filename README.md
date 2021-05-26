@@ -6,7 +6,7 @@
 
 <p align="center">
 	<img src="https://prow.ci.openshift.org/badge.svg?jobs=pull-ci-openshift-reference-addon-main*">
-	<img src="https://img.shields.io/github/license/mt-sre/reference-addon"/>
+	<img src="https://img.shields.io/github/license/openshift/reference-addon"/>
 	<img src="https://img.shields.io/badge/Coolness%20Factor-Over%209000!-blue"/>
 </p>
 

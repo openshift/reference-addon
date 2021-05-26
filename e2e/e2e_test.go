@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mt-sre/reference-addon/e2e"
+	"github.com/openshift/reference-addon/e2e"
 )
 
 func TestMain(m *testing.M) {

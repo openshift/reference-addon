@@ -285,15 +285,28 @@ push-images: \
 	push-image-reference-addon-manager
 .PHONY: push-images
 
+build-image-reference-addon-bundle: clean-image-cache-reference-addon-bundle
+	@echo "building image ${IMAGE_ORG}/reference-addon-bundle:${VERSION}..."
+	@(source hack/determine-container-runtime.sh; \
+		cp -a "config/olm/v0.1.0/." ".cache/image/reference-addon-bundle"; \
+		cp -a "config/docker/reference-addon-bundle.Dockerfile" ".cache/image/reference-addon-bundle/Dockerfile"; \
+		echo "building ${IMAGE_ORG}/reference-addon-bundle:${VERSION}"; \
+		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/reference-addon-bundle:${VERSION}" ".cache/image/reference-addon-bundle"; \
+		$$CONTAINER_COMMAND image save -o ".cache/image/reference-addon-bundle.tar" "${IMAGE_ORG}/reference-addon-bundle:${VERSION}"; \
+		echo) 2>&1 | sed 's/^/  /'
+
 .SECONDEXPANSION:
-build-image-%: bin/linux_amd64/$$*
+# cleans the built image .tar and image build directory
+clean-image-cache-%:
+	@rm -rf ".cache/image/$*" ".cache/image/$*.tar"
+	@mkdir -p ".cache/image/$*"
+
+build-image-%: clean-image-cache-%
 	@echo "building image ${IMAGE_ORG}/$*:${VERSION}..."
 	@(source hack/determine-container-runtime.sh; \
-		rm -rf ".cache/image/$*" ".cache/image/$*.tar"; \
-		mkdir -p ".cache/image/$*"; \
 		cp -a "bin/linux_amd64/$*" ".cache/image/$*"; \
-		cp -a "config/docker/$*.Dockerfile" ".cache/image/$*/Dockerfile"; \
 		cp -a "config/docker/passwd" ".cache/image/$*/passwd"; \
+		cp -a "config/docker/$*.Dockerfile" ".cache/image/$*/Dockerfile"; \
 		echo "building ${IMAGE_ORG}/$*:${VERSION}"; \
 		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/$*:${VERSION}" ".cache/image/$*"; \
 		$$CONTAINER_COMMAND image save -o ".cache/image/$*.tar" "${IMAGE_ORG}/$*:${VERSION}"; \

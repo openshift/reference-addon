@@ -11,6 +11,12 @@ metadata:
   namespace: reference-addon
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -40,19 +46,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: reference-addon
-rules:
-# - apiGroups:
-#   - "addons.managed.openshift.io"
-#   resources:
-#   - addons
-#   - addons/status
-#   - addons/finalizers
-#   verbs:
-#   - get
-#   - list
-#   - watch
-#   - update
-#   - patch
+rules: []
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

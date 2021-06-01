@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -92,6 +93,10 @@ func LoadObjectsFromDeploymentFiles(t *testing.T) []unstructured.Unstructured {
 	var objects []unstructured.Unstructured
 	for _, f := range files {
 		if f.IsDir() {
+			continue
+		}
+		if strings.Contains(f.Name(), ".tpl.") {
+			// skip template files
 			continue
 		}
 		if path.Ext(f.Name()) != ".yaml" {

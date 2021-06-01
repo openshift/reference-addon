@@ -7,6 +7,7 @@ KIND_VERSION:=v0.10.0
 YQ_VERSION:=v4@v4.7.0
 GOIMPORTS_VERSION:=v0.1.0
 GOLANGCI_LINT_VERSION:=v1.39.0
+OLM_VERSION:=v0.17.0
 
 # Build Flags
 export CGO_ENABLED:=0
@@ -248,7 +249,19 @@ load-reference-addon: build-image-reference-addon-manager
 # Template deployment
 config/deploy/deployment.yaml: FORCE $(YQ)
 	@yq eval '.spec.template.spec.containers[0].image = "$(REFERENCE_ADDON_MANAGER_IMAGE)"' \
-		config/deploy/deployment.yaml.tpl > config/deploy/deployment.yaml
+		config/deploy/deployment.tpl.yaml > config/deploy/deployment.yaml
+
+# Installs OLM (Operator Lifecycle Manager) into the currently selected cluster.
+apply-olm:
+	@echo "installing OLM $(OLM_VERSION)..."
+	@(kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/$(OLM_VERSION)/crds.yaml \
+		&& kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/$(OLM_VERSION)/olm.yaml \
+		&& echo -e "\nwaiting for deployment/olm-operator..." \
+		&& kubectl wait --for=condition=available deployment/olm-operator -n olm --timeout=240s \
+		&& echo -e "\nwaiting for deployment/catalog-operator..." \
+		&& kubectl wait --for=condition=available deployment/catalog-operator -n olm --timeout=240s \
+		&& echo) 2>&1 | sed 's/^/  /'
+.PHONY: apply-olm
 
 # Installs the Addon Operator into the kind e2e cluster.
 apply-reference-addon: $(YQ) load-reference-addon config/deploy/deployment.yaml

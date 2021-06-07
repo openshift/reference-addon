@@ -8,6 +8,7 @@ YQ_VERSION:=v4@v4.7.0
 GOIMPORTS_VERSION:=v0.1.0
 GOLANGCI_LINT_VERSION:=v1.39.0
 OLM_VERSION:=v0.17.0
+OPM_VERSION:=v1.17.2
 
 # Build Flags
 export CGO_ENABLED:=0
@@ -138,6 +139,21 @@ $(GOLANGCI_LINT):
 	@rm -rf "$(GOLANGCI_LINT_TMP)" "$(dir $(GOLANGCI_LINT))" \
 		&& mkdir -p "$(dir $(GOLANGCI_LINT))" \
 		&& touch "$(GOLANGCI_LINT)" \
+		&& echo
+
+OPM:=$(DEPENDENCIES)/opm/$(OPM_VERSION)
+$(OPM):
+	@echo "installing opm $(OPM_VERSION)..."
+	$(eval OPM_TMP := $(shell mktemp -d))
+	@(cd "$(OPM_TMP)"; \
+		curl -L --fail \
+		https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/linux-amd64-opm -o opm; \
+		chmod +x opm; \
+		mv opm $(GOBIN); \
+	) 2>&1 | sed 's/^/  /'
+	@rm -rf "$(OPM_TMP)" "$(dir $(OPM))" \
+		&& mkdir -p "$(dir $(OPM))" \
+		&& touch "$(OPM)" \
 		&& echo
 
 # installs all project dependencies
@@ -310,9 +326,9 @@ build-image-reference-addon-bundle: \
 # Index image contains a list of bundle images for use in a CatalogSource.
 # Warning!
 # The bundle image needs to be pushed so the opm CLI can create the index image.
-build-image-reference-addon-index: | \
+build-image-reference-addon-index: $(OPM) \
 	clean-image-cache-reference-addon-index \
-	build-image-reference-addon-bundle \
+	| build-image-reference-addon-bundle \
 	push-image-reference-addon-bundle
 	$(eval IMAGE_NAME := reference-addon-index)
 	@echo "building image ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}..."

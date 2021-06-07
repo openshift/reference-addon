@@ -263,6 +263,13 @@ apply-olm:
 		&& echo) 2>&1 | sed 's/^/  /'
 .PHONY: apply-olm
 
+# Installs the OpenShift/OKD console into the currently selected cluster.
+apply-openshift-console:
+	@echo "installing OpenShift console :latest..."
+	@(kubectl apply -f hack/openshift-console.yaml \
+		&& echo) 2>&1 | sed 's/^/  /'
+.PHONY: apply-openshift-console
+
 # Installs the Addon Operator into the kind e2e cluster.
 apply-reference-addon: $(YQ) load-reference-addon config/deploy/deployment.yaml
 	@echo "installing Addon Operator $(VERSION)..."
@@ -272,6 +279,51 @@ apply-reference-addon: $(YQ) load-reference-addon config/deploy/deployment.yaml
 		kubectl wait --for=condition=available deployment/reference-addon -n reference-addon --timeout=240s; \
 		echo) 2>&1 | sed 's/^/  /'
 .PHONY: apply-reference-addon
+
+# ------
+# OLM
+# ------
+
+# Template Cluster Service Version / CSV
+# By setting the container image to deploy.
+config/olm/reference-addon.csv.yaml: FORCE $(YQ)
+	@yq eval '.spec.install.spec.deployments[0].spec.template.spec.containers[0].image = "$(REFERENCE_ADDON_MANAGER_IMAGE)" | .metadata.annotations.containerImage = "$(REFERENCE_ADDON_MANAGER_IMAGE)"' \
+	config/olm/reference-addon.csv.tpl.yaml > config/olm/reference-addon.csv.yaml
+
+# Bundle image contains the manifests and CSV for a single version of this operator.
+build-image-reference-addon-bundle: \
+	clean-image-cache-reference-addon-bundle \
+	config/olm/reference-addon.csv.yaml
+	$(eval IMAGE_NAME := reference-addon-bundle)
+	@echo "building image ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}..."
+	@(source hack/determine-container-runtime.sh; \
+		mkdir -p ".cache/image/${IMAGE_NAME}/manifests"; \
+		mkdir -p ".cache/image/${IMAGE_NAME}/metadata"; \
+		cp -a "config/olm/reference-addon.csv.yaml" ".cache/image/${IMAGE_NAME}/manifests"; \
+		cp -a "config/olm/annotations.yaml" ".cache/image/${IMAGE_NAME}/metadata"; \
+		cp -a "config/docker/${IMAGE_NAME}.Dockerfile" ".cache/image/${IMAGE_NAME}/Dockerfile"; \
+		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}" ".cache/image/${IMAGE_NAME}"; \
+		$$CONTAINER_COMMAND image save -o ".cache/image/${IMAGE_NAME}.tar" "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}"; \
+		echo) 2>&1 | sed 's/^/  /'
+.PHONY: build-image-reference-addon-bundle
+
+# Index image contains a list of bundle images for use in a CatalogSource.
+# Warning!
+# The bundle image needs to be pushed so the opm CLI can create the index image.
+build-image-reference-addon-index: | \
+	clean-image-cache-reference-addon-index \
+	build-image-reference-addon-bundle \
+	push-image-reference-addon-bundle
+	$(eval IMAGE_NAME := reference-addon-index)
+	@echo "building image ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}..."
+	@(source hack/determine-container-runtime.sh; \
+		echo "building ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}"; \
+		opm index add --container-tool $$CONTAINER_COMMAND \
+		--bundles ${IMAGE_ORG}/reference-addon-bundle:${VERSION} \
+		--tag ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}; \
+		$$CONTAINER_COMMAND image save -o ".cache/image/${IMAGE_NAME}.tar" "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}"; \
+		echo) 2>&1 | sed 's/^/  /'
+.PHONY: build-image-reference-addon-index
 
 # ----------------
 # Container Images
@@ -284,16 +336,6 @@ build-images: \
 push-images: \
 	push-image-reference-addon-manager
 .PHONY: push-images
-
-build-image-reference-addon-bundle: clean-image-cache-reference-addon-bundle
-	@echo "building image ${IMAGE_ORG}/reference-addon-bundle:${VERSION}..."
-	@(source hack/determine-container-runtime.sh; \
-		cp -a "config/olm/v0.1.0/." ".cache/image/reference-addon-bundle"; \
-		cp -a "config/docker/reference-addon-bundle.Dockerfile" ".cache/image/reference-addon-bundle/Dockerfile"; \
-		echo "building ${IMAGE_ORG}/reference-addon-bundle:${VERSION}"; \
-		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/reference-addon-bundle:${VERSION}" ".cache/image/reference-addon-bundle"; \
-		$$CONTAINER_COMMAND image save -o ".cache/image/reference-addon-bundle.tar" "${IMAGE_ORG}/reference-addon-bundle:${VERSION}"; \
-		echo) 2>&1 | sed 's/^/  /'
 
 .SECONDEXPANSION:
 # cleans the built image .tar and image build directory

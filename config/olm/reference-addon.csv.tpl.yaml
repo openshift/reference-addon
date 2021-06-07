@@ -4,6 +4,8 @@ metadata:
   annotations:
     repository: https://github.com/openshift/reference-addon
     support: "false"
+    containerImage: +MANAGER_IMAGE_TO_REPLACE+
+    capabilities: Full Lifecycle
   name: reference-addon.v0.1.0
 spec:
   description: |-
@@ -25,8 +27,8 @@ spec:
   - name: Source Code
     url: https://github.com/openshift/reference-addon
   version: 0.1.0
-  # cleanup:
-  #   enabled: false
+  cleanup:
+    enabled: false
   installModes:
   - supported: true
     type: OwnNamespace
@@ -63,8 +65,6 @@ spec:
         serviceAccountName: reference-addon
       deployments:
       - name: reference-addon
-        # labels:
-        #   app.kubernetes.io/name: reference-addon
         spec:
           replicas: 1
           selector:
@@ -78,7 +78,7 @@ spec:
               serviceAccountName: reference-addon
               containers:
               - name: manager
-                image: quay.io/app-sre/reference-addon-manager:main-5738af4
+                image: +MANAGER_IMAGE_TO_REPLACE+
                 args:
                 - --enable-leader-election
                 resources:

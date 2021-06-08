@@ -64,7 +64,7 @@ spec:
           - delete
         serviceAccountName: reference-addon
       deployments:
-      - name: reference-addon
+      - name: reference-addon-manager
         spec:
           replicas: 1
           selector:

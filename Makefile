@@ -7,6 +7,8 @@ KIND_VERSION:=v0.10.0
 YQ_VERSION:=v4@v4.7.0
 GOIMPORTS_VERSION:=v0.1.0
 GOLANGCI_LINT_VERSION:=v1.39.0
+OLM_VERSION:=v0.17.0
+OPM_VERSION:=v1.17.2
 
 # Build Flags
 export CGO_ENABLED:=0
@@ -139,6 +141,21 @@ $(GOLANGCI_LINT):
 		&& touch "$(GOLANGCI_LINT)" \
 		&& echo
 
+OPM:=$(DEPENDENCIES)/opm/$(OPM_VERSION)
+$(OPM):
+	@echo "installing opm $(OPM_VERSION)..."
+	$(eval OPM_TMP := $(shell mktemp -d))
+	@(cd "$(OPM_TMP)"; \
+		curl -L --fail \
+		https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/linux-amd64-opm -o opm; \
+		chmod +x opm; \
+		mv opm $(GOBIN); \
+	) 2>&1 | sed 's/^/  /'
+	@rm -rf "$(OPM_TMP)" "$(dir $(OPM))" \
+		&& mkdir -p "$(dir $(OPM))" \
+		&& touch "$(OPM)" \
+		&& echo
+
 # installs all project dependencies
 dependencies: \
 	$(KIND) \
@@ -248,7 +265,26 @@ load-reference-addon: build-image-reference-addon-manager
 # Template deployment
 config/deploy/deployment.yaml: FORCE $(YQ)
 	@yq eval '.spec.template.spec.containers[0].image = "$(REFERENCE_ADDON_MANAGER_IMAGE)"' \
-		config/deploy/deployment.yaml.tpl > config/deploy/deployment.yaml
+		config/deploy/deployment.tpl.yaml > config/deploy/deployment.yaml
+
+# Installs OLM (Operator Lifecycle Manager) into the currently selected cluster.
+apply-olm:
+	@echo "installing OLM $(OLM_VERSION)..."
+	@(kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/$(OLM_VERSION)/crds.yaml \
+		&& kubectl apply -f https://github.com/operator-framework/operator-lifecycle-manager/releases/download/$(OLM_VERSION)/olm.yaml \
+		&& echo -e "\nwaiting for deployment/olm-operator..." \
+		&& kubectl wait --for=condition=available deployment/olm-operator -n olm --timeout=240s \
+		&& echo -e "\nwaiting for deployment/catalog-operator..." \
+		&& kubectl wait --for=condition=available deployment/catalog-operator -n olm --timeout=240s \
+		&& echo) 2>&1 | sed 's/^/  /'
+.PHONY: apply-olm
+
+# Installs the OpenShift/OKD console into the currently selected cluster.
+apply-openshift-console:
+	@echo "installing OpenShift console :latest..."
+	@(kubectl apply -f hack/openshift-console.yaml \
+		&& echo) 2>&1 | sed 's/^/  /'
+.PHONY: apply-openshift-console
 
 # Installs the Addon Operator into the kind e2e cluster.
 apply-reference-addon: $(YQ) load-reference-addon config/deploy/deployment.yaml
@@ -259,6 +295,51 @@ apply-reference-addon: $(YQ) load-reference-addon config/deploy/deployment.yaml
 		kubectl wait --for=condition=available deployment/reference-addon -n reference-addon --timeout=240s; \
 		echo) 2>&1 | sed 's/^/  /'
 .PHONY: apply-reference-addon
+
+# ------
+# OLM
+# ------
+
+# Template Cluster Service Version / CSV
+# By setting the container image to deploy.
+config/olm/reference-addon.csv.yaml: FORCE $(YQ)
+	@yq eval '.spec.install.spec.deployments[0].spec.template.spec.containers[0].image = "$(REFERENCE_ADDON_MANAGER_IMAGE)" | .metadata.annotations.containerImage = "$(REFERENCE_ADDON_MANAGER_IMAGE)"' \
+	config/olm/reference-addon.csv.tpl.yaml > config/olm/reference-addon.csv.yaml
+
+# Bundle image contains the manifests and CSV for a single version of this operator.
+build-image-reference-addon-bundle: \
+	clean-image-cache-reference-addon-bundle \
+	config/olm/reference-addon.csv.yaml
+	$(eval IMAGE_NAME := reference-addon-bundle)
+	@echo "building image ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}..."
+	@(source hack/determine-container-runtime.sh; \
+		mkdir -p ".cache/image/${IMAGE_NAME}/manifests"; \
+		mkdir -p ".cache/image/${IMAGE_NAME}/metadata"; \
+		cp -a "config/olm/reference-addon.csv.yaml" ".cache/image/${IMAGE_NAME}/manifests"; \
+		cp -a "config/olm/annotations.yaml" ".cache/image/${IMAGE_NAME}/metadata"; \
+		cp -a "config/docker/${IMAGE_NAME}.Dockerfile" ".cache/image/${IMAGE_NAME}/Dockerfile"; \
+		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}" ".cache/image/${IMAGE_NAME}"; \
+		$$CONTAINER_COMMAND image save -o ".cache/image/${IMAGE_NAME}.tar" "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}"; \
+		echo) 2>&1 | sed 's/^/  /'
+.PHONY: build-image-reference-addon-bundle
+
+# Index image contains a list of bundle images for use in a CatalogSource.
+# Warning!
+# The bundle image needs to be pushed so the opm CLI can create the index image.
+build-image-reference-addon-index: $(OPM) \
+	clean-image-cache-reference-addon-index \
+	| build-image-reference-addon-bundle \
+	push-image-reference-addon-bundle
+	$(eval IMAGE_NAME := reference-addon-index)
+	@echo "building image ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}..."
+	@(source hack/determine-container-runtime.sh; \
+		echo "building ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}"; \
+		opm index add --container-tool $$CONTAINER_COMMAND \
+		--bundles ${IMAGE_ORG}/reference-addon-bundle:${VERSION} \
+		--tag ${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}; \
+		$$CONTAINER_COMMAND image save -o ".cache/image/${IMAGE_NAME}.tar" "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}"; \
+		echo) 2>&1 | sed 's/^/  /'
+.PHONY: build-image-reference-addon-index
 
 # ----------------
 # Container Images
@@ -273,14 +354,17 @@ push-images: \
 .PHONY: push-images
 
 .SECONDEXPANSION:
-build-image-%: bin/linux_amd64/$$*
+# cleans the built image .tar and image build directory
+clean-image-cache-%:
+	@rm -rf ".cache/image/$*" ".cache/image/$*.tar"
+	@mkdir -p ".cache/image/$*"
+
+build-image-%: clean-image-cache-%
 	@echo "building image ${IMAGE_ORG}/$*:${VERSION}..."
 	@(source hack/determine-container-runtime.sh; \
-		rm -rf ".cache/image/$*" ".cache/image/$*.tar"; \
-		mkdir -p ".cache/image/$*"; \
 		cp -a "bin/linux_amd64/$*" ".cache/image/$*"; \
-		cp -a "config/docker/$*.Dockerfile" ".cache/image/$*/Dockerfile"; \
 		cp -a "config/docker/passwd" ".cache/image/$*/passwd"; \
+		cp -a "config/docker/$*.Dockerfile" ".cache/image/$*/Dockerfile"; \
 		echo "building ${IMAGE_ORG}/$*:${VERSION}"; \
 		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/$*:${VERSION}" ".cache/image/$*"; \
 		$$CONTAINER_COMMAND image save -o ".cache/image/$*.tar" "${IMAGE_ORG}/$*:${VERSION}"; \

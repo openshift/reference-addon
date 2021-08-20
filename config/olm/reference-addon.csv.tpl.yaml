@@ -6,7 +6,7 @@ metadata:
     support: "false"
     containerImage: +MANAGER_IMAGE_TO_REPLACE+
     capabilities: Full Lifecycle
-  name: reference-addon.v0.1.0
+  name: reference-addon.v0.1.4
 spec:
   description: |-
     Reference Addon is a real Addon, created to validate and demonstrate the Addons Flow.
@@ -26,7 +26,7 @@ spec:
   links:
   - name: Source Code
     url: https://github.com/openshift/reference-addon
-  version: 0.1.0
+  version: 0.1.4
   cleanup:
     enabled: false
   installModes:

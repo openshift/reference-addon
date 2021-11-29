@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -14,7 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	refapis "github.com/openshift/reference-addon/apis"
-	// "github.com/openshift/reference-addon/internal/controllers"
+	"github.com/openshift/reference-addon/internal/controllers"
+	"github.com/openshift/reference-addon/internal/utils"
+	addonsv1apis "github.com/openshift/addon-operator/apis"
+	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 )
 
 var (
@@ -25,6 +29,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = refapis.AddToScheme(scheme)
+	_ = addonsv1apis.AddToScheme(scheme)
 }
 
 func main() {
@@ -92,14 +97,31 @@ func main() {
 		}
 	}
 
-	// if err = (&controllers.AddonReconciler{
-	// 	Client: mgr.GetClient(),
-	// 	Log:    ctrl.Log.WithName("controllers").WithName("Addon"),
-	// 	Scheme: mgr.GetScheme(),
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "Addon")
-	// 	os.Exit(1)
-	// }
+	// the following sectiom hooks up a heartbeat reporter with the current addon/operator
+	///////////////////////////////////////////////////// -------------------------------- /////////////////////////////////////////////////////
+	addonName := "reference-addon"
+	// the following 'handleAddonInstanceConfigurationChanges' function can be absolutely anything depending how reference-addon would want to deal with AddonInstance's configuration change
+	handleAddonInstanceConfigurationChanges := func(addonsv1alpha1.AddonInstanceSpec) {
+		fmt.Println("Handling AddonInstance's configuration changes, whooossh!!!")
+	}
+
+	// setup the heartbeat reporter
+	heartbeatCommunicatorCh, err := utils.SetupHeartbeatReporter(mgr, addonName, handleAddonInstanceConfigurationChanges)
+	if err != nil {
+		setupLog.Error(err, "unable to setup heartbeat reporter")
+		os.Exit(1)
+	}
+	///////////////////////////////////////////////////// -------------------------------- /////////////////////////////////////////////////////
+
+	if err = (&controllers.ReferenceAddonReconciler{
+		Client:                       mgr.GetClient(),
+		Log:                          ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
+		Scheme:                       mgr.GetScheme(),
+		HeartbeatCommunicatorChannel: heartbeatCommunicatorCh, // linking the heartbeat communicator channel with the reconciler
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

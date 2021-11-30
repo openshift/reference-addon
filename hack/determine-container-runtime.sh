@@ -7,6 +7,7 @@
 # accordingly
 # to override: set CONTAINER_RUNTIME to either docker or podman
 
+export GOFLAGS=""
 function __export_docker() {
 	# prepend sudo if user is not in docker group
 	if [[ -z "$(groups | grep docker)" ]]; then

@@ -14,11 +14,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	addonsv1apis "github.com/openshift/addon-operator/apis"
+	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+
 	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/openshift/reference-addon/internal/utils"
-	addonsv1apis "github.com/openshift/addon-operator/apis"
-	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 )
 
 var (

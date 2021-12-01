@@ -2,14 +2,16 @@ package controllers
 
 import (
 	"context"
+	"math/rand"
+
 	"github.com/go-logr/logr"
-	"github.com/openshift/reference-addon/internal/utils"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"math/rand"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openshift/reference-addon/internal/utils"
 )
 
 type ReferenceAddonReconciler struct {

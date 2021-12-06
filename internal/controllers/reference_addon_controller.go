@@ -10,20 +10,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/openshift/reference-addon/internal/utils"
 )
 
 type ReferenceAddonReconciler struct {
 	client.Client
-	Log                          logr.Logger
-	Scheme                       *runtime.Scheme
-	HeartbeatCommunicatorChannel chan metav1.Condition
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
+	latestHeartbeat metav1.Condition
 }
 
 func (r *ReferenceAddonReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("addon", req.NamespacedName.String())
+	_ = r.Log.WithValues("addon", req.NamespacedName.String())
 
 	successfulCondition := metav1.Condition{
 		Type:    "addons.managed.openshift.io/Healthy",
@@ -40,12 +38,20 @@ func (r *ReferenceAddonReconciler) Reconcile(
 
 	// approximately 5/10 times report a failure condition (probability ~ 50%) and remaining number of times report a successful condition
 	if rand.Intn(10) >= 5 {
-		utils.CommunicateHeartbeat(r.HeartbeatCommunicatorChannel, failureCondition, log)
+		r.SetLatestHeartbeat(failureCondition)
 	} else {
-		utils.CommunicateHeartbeat(r.HeartbeatCommunicatorChannel, successfulCondition, log)
+		r.SetLatestHeartbeat(successfulCondition)
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r ReferenceAddonReconciler) GetLatestHeartbeat() metav1.Condition {
+	return r.latestHeartbeat
+}
+
+func (r *ReferenceAddonReconciler) SetLatestHeartbeat(heartbeat metav1.Condition) {
+	r.latestHeartbeat = heartbeat
 }
 
 func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {

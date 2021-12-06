@@ -98,28 +98,23 @@ func main() {
 		}
 	}
 
-	// the following sectiom hooks up a heartbeat reporter with the current addon/operator
-	///////////////////////////////////////////////////// -------------------------------- /////////////////////////////////////////////////////
+	// the following section hooks up a heartbeat reporter with the current addon/operator
 	addonName := "reference-addon"
 	// the following 'handleAddonInstanceConfigurationChanges' function can be absolutely anything depending how reference-addon would want to deal with AddonInstance's configuration change
 	handleAddonInstanceConfigurationChanges := func(addonsv1alpha1.AddonInstanceSpec) {
 		fmt.Println("Handling AddonInstance's configuration changes, whooossh!!!")
 	}
-
+	r := controllers.ReferenceAddonReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
+		Scheme: mgr.GetScheme(),
+	}
 	// setup the heartbeat reporter
-	heartbeatCommunicatorCh, err := utils.SetupHeartbeatReporter(mgr, addonName, handleAddonInstanceConfigurationChanges)
-	if err != nil {
+	if err := utils.SetupHeartbeatReporter(&r, mgr, addonName, handleAddonInstanceConfigurationChanges); err != nil {
 		setupLog.Error(err, "unable to setup heartbeat reporter")
 		os.Exit(1)
 	}
-	///////////////////////////////////////////////////// -------------------------------- /////////////////////////////////////////////////////
-
-	if err = (&controllers.ReferenceAddonReconciler{
-		Client:                       mgr.GetClient(),
-		Log:                          ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
-		Scheme:                       mgr.GetScheme(),
-		HeartbeatCommunicatorChannel: heartbeatCommunicatorCh, // linking the heartbeat communicator channel with the reconciler
-	}).SetupWithManager(mgr); err != nil {
+	if err = r.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")
 		os.Exit(1)
 	}

@@ -5,11 +5,12 @@ import (
 	"math/rand"
 
 	"github.com/go-logr/logr"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
 )
 
 type ReferenceAddonReconciler struct {
@@ -56,6 +57,6 @@ func (r *ReferenceAddonReconciler) SetLatestHeartbeat(heartbeat metav1.Condition
 
 func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.Pod{}). // just a placeholder for now
+		For(&refapisv1alpha1.ReferenceAddon{}).
 		Complete(r)
 }

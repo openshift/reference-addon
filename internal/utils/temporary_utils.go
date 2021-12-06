@@ -54,7 +54,7 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, addo
 		for {
 			currentHeartbeatCondition := r.GetLatestHeartbeat()
 			if err := SetAddonInstanceCondition(ctx, mgr.GetClient(), currentHeartbeatCondition, addonName); err != nil {
-				mgr.GetLogger().Error(err, "error occurred while setting the condition", fmt.Sprintf("%+v", currentHeartbeatCondition))
+				mgr.GetLogger().Error(err, "error occurred while setting the condition", "HeartbeatCondition", fmt.Sprintf("%+v", currentHeartbeatCondition))
 			}
 
 			// checking latest addonInstance configuration and seeing if it differs with current AddonInstance configuration

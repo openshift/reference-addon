@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"math/rand"
 
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,15 +32,15 @@ func (r *ReferenceAddonReconciler) Reconcile(
 	failureCondition := metav1.Condition{
 		Type:    "addons.managed.openshift.io/Healthy",
 		Status:  "False",
-		Reason:  "ComponentsDown",
-		Message: "Components X, Y and Z are down!",
+		Reason:  "ImproperNaming",
+		Message: "The addon resources are improperly named",
 	}
 
-	// approximately 5/10 times report a failure condition (probability ~ 50%) and remaining number of times report a successful condition
-	if rand.Intn(10) >= 5 {
-		r.SetLatestHeartbeat(failureCondition)
-	} else {
+	// if the ReferenceAddon object getting reconciled has the name "reference-addon", only then report a successful heartbeat
+	if req.NamespacedName.Name == "reference-addon" {
 		r.SetLatestHeartbeat(successfulCondition)
+	} else {
+		r.SetLatestHeartbeat(failureCondition)
 	}
 
 	return ctrl.Result{}, nil

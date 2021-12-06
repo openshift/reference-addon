@@ -21,6 +21,11 @@ spec:
         image: quay.io/openshift/reference-addon:latest
         args:
         - --enable-leader-election
+        env:
+        - name: ADDON_TARGET_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace  ## because the addon will be setup in the targetNamespace only
         resources:
           limits:
             cpu: 100m

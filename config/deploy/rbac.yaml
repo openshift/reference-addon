@@ -57,22 +57,6 @@ rules:
   - watch
   - update
   - patch
-- apiGroups:
-  - "addons.managed.openshift.io"
-  resources:
-  - addons
-  resourceNames:
-  - reference-addon ## name of the addon
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - "reference.addons.managed.openshift.io"
-  resources:
-  - referenceaddons
-  - referenceaddons/status
-  verbs:
-  - "*"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

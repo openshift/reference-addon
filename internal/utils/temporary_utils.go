@@ -38,9 +38,9 @@ type ReconcilerWithHeartbeat interface {
 func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, addonName string, handleAddonInstanceConfigurationChanges func(addonsv1alpha1.AddonInstanceSpec)) error {
 	defaultHealthyHeartbeatConditionToBeginWith := metav1.Condition{
 		Type:    "addons.managed.openshift.io/Healthy",
-		Status:  "True",
-		Reason:  "AddonHealthy",
-		Message: fmt.Sprintf("Addon '%s' is perfectly healthy", addonName),
+		Status:  "False",
+		Reason:  "NoHeartbeatReported",
+		Message: fmt.Sprintf("Addon '%s' hasn't reported any heartbeat yet", addonName),
 	}
 	// initialized with a healthy heartbeat condition corresponding to the addon
 	r.SetLatestHeartbeat(defaultHealthyHeartbeatConditionToBeginWith)

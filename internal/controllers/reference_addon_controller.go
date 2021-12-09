@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,7 @@ func (r *ReferenceAddonReconciler) Reconcile(
 	}
 
 	// if the ReferenceAddon object getting reconciled has the name "reference-addon", only then report a successful heartbeat
-	if req.NamespacedName.Name == "reference-addon" {
+	if strings.HasPrefix(req.NamespacedName.Name, "reference-addon-") || strings.HasPrefix(req.NamespacedName.Name, "redhat-") {
 		r.SetLatestHeartbeat(successfulCondition)
 	} else {
 		r.SetLatestHeartbeat(failureCondition)

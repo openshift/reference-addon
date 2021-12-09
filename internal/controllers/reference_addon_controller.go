@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -45,6 +46,15 @@ func (r *ReferenceAddonReconciler) Reconcile(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r ReferenceAddonReconciler) GetAddonName() string {
+	return "reference-addon"
+}
+
+func (r ReferenceAddonReconciler) GetAddonTargetNamespace() string {
+	// assuming ADDON_TARGET_NAMESPACE would be populated via downwards API in the deployment spec of the reference addon
+	return os.Getenv("ADDON_TARGET_NAMESPACE")
 }
 
 func (r ReferenceAddonReconciler) GetLatestHeartbeat() metav1.Condition {

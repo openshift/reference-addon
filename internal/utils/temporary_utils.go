@@ -5,7 +5,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"time"
 
@@ -18,8 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func SetAddonInstanceCondition(ctx context.Context, cacheBackedKubeClient client.Client, condition metav1.Condition, addonName string) error {
-	addonInstance, err := getAddonInstanceByAddon(ctx, cacheBackedKubeClient, addonName)
+func SetAddonInstanceCondition(ctx context.Context, cacheBackedKubeClient client.Client, condition metav1.Condition, addonName string, targetNamespace string) error {
+	addonInstance, err := getAddonInstanceByAddon(ctx, cacheBackedKubeClient, addonName, targetNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to fetch AddonInstance by the addon '%s': %w", addonName, err)
 	}
@@ -31,6 +30,8 @@ func SetAddonInstanceCondition(ctx context.Context, cacheBackedKubeClient client
 
 type ReconcilerWithHeartbeat interface {
 	reconcile.Reconciler
+	GetAddonName() string            // so as to give the addon developer the freedom to return addon's name the way they want: through a direct hardcoded string or through env var populated by downwards API
+	GetAddonTargetNamespace() string // so as to give the addon developer the freedom to return targetNamespace the way they want: through a direct hardcoded string or through env var populated by downwards API
 	GetLatestHeartbeat() metav1.Condition
 	SetLatestHeartbeat(metav1.Condition)
 }
@@ -46,7 +47,7 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, addo
 	r.SetLatestHeartbeat(defaultHealthyHeartbeatConditionToBeginWith)
 
 	heartbeatReporterFunction := func(ctx context.Context) error {
-		currentAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName)
+		currentAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
 		if err != nil {
 			return fmt.Errorf("failed to get the AddonInstance configuration corresponding to the Addon '%s': %w", addonName, err)
 		}
@@ -54,12 +55,12 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, addo
 		// Heartbeat reporter section: report a heartbeat at an interval ('currentAddonInstanceConfiguration.HeartbeatUpdatePeriod' seconds)
 		for {
 			currentHeartbeatCondition := r.GetLatestHeartbeat()
-			if err := SetAddonInstanceCondition(ctx, mgr.GetClient(), currentHeartbeatCondition, addonName); err != nil {
+			if err := SetAddonInstanceCondition(ctx, mgr.GetClient(), currentHeartbeatCondition, addonName, r.GetAddonTargetNamespace()); err != nil {
 				mgr.GetLogger().Error(err, "error occurred while setting the condition", "HeartbeatCondition", fmt.Sprintf("%+v", currentHeartbeatCondition))
 			}
 
 			// checking latest addonInstance configuration and seeing if it differs with current AddonInstance configuration
-			latestAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName)
+			latestAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
 			if err != nil {
 				return fmt.Errorf("failed to get the AddonInstance configuration corresponding to the Addon '%s': %w", addonName, err)
 			}
@@ -80,16 +81,15 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, addo
 	return nil
 }
 
-func GetAddonInstanceConfiguration(ctx context.Context, cacheBackedKubeClient client.Client, addonName string) (addonsv1alpha1.AddonInstanceSpec, error) {
-	addonInstance, err := getAddonInstanceByAddon(ctx, cacheBackedKubeClient, addonName)
+func GetAddonInstanceConfiguration(ctx context.Context, cacheBackedKubeClient client.Client, addonName string, targetNamespace string) (addonsv1alpha1.AddonInstanceSpec, error) {
+	addonInstance, err := getAddonInstanceByAddon(ctx, cacheBackedKubeClient, addonName, targetNamespace)
 	if err != nil {
 		return addonsv1alpha1.AddonInstanceSpec{}, fmt.Errorf("failed to fetch AddonInstance by the addon '%s': %w", addonName, err)
 	}
 	return addonInstance.Spec, nil
 }
 
-func getAddonInstanceByAddon(ctx context.Context, cacheBackedKubeClient client.Client, addonName string) (addonsv1alpha1.AddonInstance, error) {
-	targetNamespace := parseTargetNamespace()
+func getAddonInstanceByAddon(ctx context.Context, cacheBackedKubeClient client.Client, addonName string, targetNamespace string) (addonsv1alpha1.AddonInstance, error) {
 	if targetNamespace == "" {
 		return addonsv1alpha1.AddonInstance{}, fmt.Errorf("failed to fetch the target namespace of the addon. ADDON_TARGET_NAMESPACE env variable not found")
 	}
@@ -98,11 +98,6 @@ func getAddonInstanceByAddon(ctx context.Context, cacheBackedKubeClient client.C
 		return addonsv1alpha1.AddonInstance{}, fmt.Errorf("failed to fetch the AddonInstance resource in the namespace %s: %w", targetNamespace, err)
 	}
 	return *addonInstance, nil
-}
-
-func parseTargetNamespace() string {
-	// expecting ADDON_TARGET_NAMESPACE to be populated via downwards API in the deployment spec of the reference addon
-	return os.Getenv("ADDON_TARGET_NAMESPACE")
 }
 
 func upsertAddonInstanceCondition(ctx context.Context, cacheBackedKubeClient client.Client, addonInstance *addonsv1alpha1.AddonInstance, condition metav1.Condition) error {

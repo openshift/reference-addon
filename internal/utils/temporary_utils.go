@@ -5,7 +5,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
@@ -34,9 +33,10 @@ type ReconcilerWithHeartbeat interface {
 	GetAddonTargetNamespace() string // so as to give the addon developer the freedom to return targetNamespace the way they want: through a direct hardcoded string or through env var populated by downwards API
 	GetLatestHeartbeat() metav1.Condition
 	SetLatestHeartbeat(metav1.Condition)
+	HandleAddonInstanceConfigurationChanges(newAddonInstanceSpec addonsv1alpha1.AddonInstanceSpec) error
 }
 
-func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, handleAddonInstanceConfigurationChanges func(addonsv1alpha1.AddonInstanceSpec)) error {
+func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager) error {
 	addonName := r.GetAddonName()
 	defaultHealthyHeartbeatConditionToBeginWith := metav1.Condition{
 		Type:    "addons.managed.openshift.io/Healthy",
@@ -46,7 +46,6 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, hand
 	}
 	// initialized with a healthy heartbeat condition corresponding to the addon
 	r.SetLatestHeartbeat(defaultHealthyHeartbeatConditionToBeginWith)
-
 	heartbeatReporterFunction := func(ctx context.Context) error {
 		currentAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
 		if err != nil {
@@ -55,6 +54,12 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, hand
 
 		// Heartbeat reporter section: report a heartbeat at an interval ('currentAddonInstanceConfiguration.HeartbeatUpdatePeriod' seconds)
 		for {
+			latestAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
+			if err != nil {
+				mgr.GetLogger().Error(err, fmt.Sprintf("failed to get the AddonInstance configuration corresponding to the Addon '%s'", addonName))
+			}
+			currentAddonInstanceConfiguration = latestAddonInstanceConfiguration
+
 			currentHeartbeatCondition := r.GetLatestHeartbeat()
 			if err := SetAddonInstanceCondition(ctx, mgr.GetClient(), currentHeartbeatCondition, addonName, r.GetAddonTargetNamespace()); err != nil {
 				mgr.GetLogger().Error(err, "error occurred while setting the condition", "HeartbeatCondition", fmt.Sprintf("%+v", currentHeartbeatCondition))
@@ -63,23 +68,22 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, hand
 				continue
 			}
 
-			// checking latest addonInstance configuration and seeing if it differs with current AddonInstance configuration
-			latestAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
-			if err != nil {
-				return fmt.Errorf("failed to get the AddonInstance configuration corresponding to the Addon '%s': %w", addonName, err)
-			}
-			if !reflect.DeepEqual(currentAddonInstanceConfiguration, latestAddonInstanceConfiguration) {
-				currentAddonInstanceConfiguration = latestAddonInstanceConfiguration
-				handleAddonInstanceConfigurationChanges(currentAddonInstanceConfiguration)
-			}
-
 			// waiting for heartbeat update period for executing the next iteration
 			<-time.After(currentAddonInstanceConfiguration.HeartbeatUpdatePeriod.Duration)
 		}
 	}
 
+	addonInstanceConfigurationChangeWatcher := func(ctx context.Context) error {
+		return SetupAddonInstanceConfigurationChangeWatcher(mgr, r)
+	}
+
 	// coupling the heartbeat reporter function with the manager
 	if err := mgr.Add(manager.RunnableFunc(heartbeatReporterFunction)); err != nil {
+		return err
+	}
+
+	// coupling the AddonInstance configuration change watcher with the manager
+	if err := mgr.Add(manager.RunnableFunc(addonInstanceConfigurationChangeWatcher)); err != nil {
 		return err
 	}
 	return nil

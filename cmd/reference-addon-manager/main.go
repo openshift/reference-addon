@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
+
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -14,12 +14,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	addonsv1apis "github.com/openshift/addon-operator/apis"
-	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
-
-	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/openshift/reference-addon/internal/utils"
+
+	refapis "github.com/openshift/reference-addon/apis"
 )
 
 var (
@@ -30,7 +28,6 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = refapis.AddToScheme(scheme)
-	_ = addonsv1apis.AddToScheme(scheme)
 }
 
 func main() {
@@ -99,17 +96,13 @@ func main() {
 	}
 
 	// the following section hooks up a heartbeat reporter with the current addon/operator
-	// the following 'handleAddonInstanceConfigurationChanges' function can be absolutely anything depending how reference-addon would want to deal with AddonInstance's configuration change
-	handleAddonInstanceConfigurationChanges := func(addonsv1alpha1.AddonInstanceSpec) {
-		fmt.Println("Handling AddonInstance's configuration changes, whooossh!!!")
-	}
 	r := controllers.ReferenceAddonReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
 		Scheme: mgr.GetScheme(),
 	}
 	// setup the heartbeat reporter
-	if err := utils.SetupHeartbeatReporter(&r, mgr, handleAddonInstanceConfigurationChanges); err != nil {
+	if err := utils.SetupHeartbeatReporter(&r, mgr); err != nil {
 		setupLog.Error(err, "unable to setup heartbeat reporter")
 		os.Exit(1)
 	}

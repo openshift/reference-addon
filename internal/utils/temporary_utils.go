@@ -36,7 +36,8 @@ type ReconcilerWithHeartbeat interface {
 	SetLatestHeartbeat(metav1.Condition)
 }
 
-func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, addonName string, handleAddonInstanceConfigurationChanges func(addonsv1alpha1.AddonInstanceSpec)) error {
+func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, handleAddonInstanceConfigurationChanges func(addonsv1alpha1.AddonInstanceSpec)) error {
+	addonName := r.GetAddonName()
 	defaultHealthyHeartbeatConditionToBeginWith := metav1.Condition{
 		Type:    "addons.managed.openshift.io/Healthy",
 		Status:  "False",
@@ -57,6 +58,9 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager, addo
 			currentHeartbeatCondition := r.GetLatestHeartbeat()
 			if err := SetAddonInstanceCondition(ctx, mgr.GetClient(), currentHeartbeatCondition, addonName, r.GetAddonTargetNamespace()); err != nil {
 				mgr.GetLogger().Error(err, "error occurred while setting the condition", "HeartbeatCondition", fmt.Sprintf("%+v", currentHeartbeatCondition))
+				// waiting for heartbeat update period for executing the next iteration
+				<-time.After(currentAddonInstanceConfiguration.HeartbeatUpdatePeriod.Duration)
+				continue
 			}
 
 			// checking latest addonInstance configuration and seeing if it differs with current AddonInstance configuration

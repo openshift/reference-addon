@@ -99,7 +99,6 @@ func main() {
 	}
 
 	// the following section hooks up a heartbeat reporter with the current addon/operator
-	addonName := "reference-addon"
 	// the following 'handleAddonInstanceConfigurationChanges' function can be absolutely anything depending how reference-addon would want to deal with AddonInstance's configuration change
 	handleAddonInstanceConfigurationChanges := func(addonsv1alpha1.AddonInstanceSpec) {
 		fmt.Println("Handling AddonInstance's configuration changes, whooossh!!!")
@@ -110,7 +109,7 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}
 	// setup the heartbeat reporter
-	if err := utils.SetupHeartbeatReporter(&r, mgr, addonName, handleAddonInstanceConfigurationChanges); err != nil {
+	if err := utils.SetupHeartbeatReporter(&r, mgr, handleAddonInstanceConfigurationChanges); err != nil {
 		setupLog.Error(err, "unable to setup heartbeat reporter")
 		os.Exit(1)
 	}

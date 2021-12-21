@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
-	"github.com/openshift/reference-addon/internal/utils"
+	"github.com/openshift/reference-addon/internal/addoninstancesdk"
 )
 
 type ReferenceAddonReconciler struct {
@@ -42,11 +42,11 @@ func (r *ReferenceAddonReconciler) Reconcile(
 
 	// if the ReferenceAddon object getting reconciled has the name "reference-addon", only then report a successful heartbeat
 	if strings.HasPrefix(req.NamespacedName.Name, "reference-addon") || strings.HasPrefix(req.NamespacedName.Name, "redhat-") {
-		if err := utils.SetAndSendHeartbeat(r, successfulCondition); err != nil {
+		if err := addoninstancesdk.SetAndSendHeartbeat(r, successfulCondition); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set and sent heartbeat: %w", err)
 		}
 	} else {
-		if err := utils.SetAndSendHeartbeat(r, failureCondition); err != nil {
+		if err := addoninstancesdk.SetAndSendHeartbeat(r, failureCondition); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to set and sent heartbeat: %w", err)
 		}
 	}

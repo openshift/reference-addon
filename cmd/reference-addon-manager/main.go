@@ -14,8 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/openshift/reference-addon/internal/addoninstancesdk"
 	"github.com/openshift/reference-addon/internal/controllers"
-	"github.com/openshift/reference-addon/internal/utils"
 
 	refapis "github.com/openshift/reference-addon/apis"
 )
@@ -102,7 +102,7 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}
 	// setup the heartbeat reporter
-	if err := utils.SetupHeartbeatReporter(&r, mgr); err != nil {
+	if err := addoninstancesdk.SetupHeartbeatReporter(&r, mgr); err != nil {
 		setupLog.Error(err, "unable to setup heartbeat reporter")
 		os.Exit(1)
 	}

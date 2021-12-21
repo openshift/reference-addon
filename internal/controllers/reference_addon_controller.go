@@ -14,13 +14,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
+	"github.com/openshift/reference-addon/internal/utils"
 )
 
 type ReferenceAddonReconciler struct {
 	client.Client
-	Log             logr.Logger
-	Scheme          *runtime.Scheme
-	latestHeartbeat metav1.Condition
+	Log    logr.Logger
+	Scheme *runtime.Scheme
 }
 
 func (r *ReferenceAddonReconciler) Reconcile(
@@ -42,9 +42,13 @@ func (r *ReferenceAddonReconciler) Reconcile(
 
 	// if the ReferenceAddon object getting reconciled has the name "reference-addon", only then report a successful heartbeat
 	if strings.HasPrefix(req.NamespacedName.Name, "reference-addon") || strings.HasPrefix(req.NamespacedName.Name, "redhat-") {
-		r.SetLatestHeartbeat(successfulCondition)
+		if err := utils.SetAndSendHeartbeat(r, successfulCondition); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to set and sent heartbeat: %w", err)
+		}
 	} else {
-		r.SetLatestHeartbeat(failureCondition)
+		if err := utils.SetAndSendHeartbeat(r, failureCondition); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to set and sent heartbeat: %w", err)
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -59,12 +63,8 @@ func (r ReferenceAddonReconciler) GetAddonTargetNamespace() string {
 	return os.Getenv("ADDON_TARGET_NAMESPACE")
 }
 
-func (r ReferenceAddonReconciler) GetLatestHeartbeat() metav1.Condition {
-	return r.latestHeartbeat
-}
-
-func (r *ReferenceAddonReconciler) SetLatestHeartbeat(heartbeat metav1.Condition) {
-	r.latestHeartbeat = heartbeat
+func (r ReferenceAddonReconciler) GetClient() client.Client {
+	return r.Client
 }
 
 // the following 'HandleAddonInstanceConfigurationChanges' method can be absolutely anything depending how reference-addon would want to deal with AddonInstance's configuration change

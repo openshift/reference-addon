@@ -5,6 +5,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
@@ -14,9 +15,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	addonsv1apis "github.com/openshift/addon-operator/apis"
 )
 
-func SetAddonInstanceCondition(ctx context.Context, cacheBackedKubeClient client.Client, condition metav1.Condition, addonName string, targetNamespace string) error {
+var (
+	latestHeartbeat metav1.Condition
+	mu              sync.Mutex
+)
+
+func setAddonInstanceCondition(ctx context.Context, cacheBackedKubeClient client.Client, condition metav1.Condition, addonName string, targetNamespace string) error {
 	addonInstance, err := getAddonInstanceByAddon(ctx, cacheBackedKubeClient, addonName, targetNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to fetch AddonInstance by the addon '%s': %w", addonName, err)
@@ -31,41 +39,63 @@ type ReconcilerWithHeartbeat interface {
 	reconcile.Reconciler
 	GetAddonName() string            // so as to give the addon developer the freedom to return addon's name the way they want: through a direct hardcoded string or through env var populated by downwards API
 	GetAddonTargetNamespace() string // so as to give the addon developer the freedom to return targetNamespace the way they want: through a direct hardcoded string or through env var populated by downwards API
-	GetLatestHeartbeat() metav1.Condition
-	SetLatestHeartbeat(metav1.Condition)
 	HandleAddonInstanceConfigurationChanges(newAddonInstanceSpec addonsv1alpha1.AddonInstanceSpec) error
+	GetClient() client.Client
+}
+
+func SetAndSendHeartbeat(r ReconcilerWithHeartbeat, heartbeat metav1.Condition) error {
+	// locking here so as to ensure the atomicity (hence, the happens-before relationship) of the operation: set `latestHeartbeat` + send the just-set `latestHeartbeat`
+	mu.Lock()
+	defer mu.Unlock()
+	latestHeartbeat = heartbeat
+	if err := setAddonInstanceCondition(context.TODO(), r.GetClient(), latestHeartbeat, r.GetAddonName(), r.GetAddonTargetNamespace()); err != nil {
+		return fmt.Errorf("failed to send the heartbeat '%+v': %w", latestHeartbeat, err)
+	}
+	return nil
+}
+
+func SendLatestHeartbeat(ctx context.Context, r ReconcilerWithHeartbeat) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if err := setAddonInstanceCondition(ctx, r.GetClient(), latestHeartbeat, r.GetAddonName(), r.GetAddonTargetNamespace()); err != nil {
+		return fmt.Errorf("failed to send the heartbeat '%+v': %w", latestHeartbeat, err)
+	}
+	return nil
 }
 
 func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager) error {
+	_ = addonsv1apis.AddToScheme(mgr.GetScheme())
+
 	addonName := r.GetAddonName()
-	defaultHealthyHeartbeatConditionToBeginWith := metav1.Condition{
-		Type:    "addons.managed.openshift.io/Healthy",
-		Status:  "False",
-		Reason:  "NoHeartbeatReported",
-		Message: fmt.Sprintf("Addon '%s' hasn't reported any heartbeat yet", addonName),
+	mu.Lock()
+	if (latestHeartbeat == metav1.Condition{}) {
+		latestHeartbeat = metav1.Condition{
+			Type:    "addons.managed.openshift.io/Healthy",
+			Status:  "False",
+			Reason:  "NoHeartbeatReported",
+			Message: fmt.Sprintf("Addon '%s' hasn't reported any heartbeat yet", addonName),
+		}
 	}
-	// initialized with a healthy heartbeat condition corresponding to the addon
-	r.SetLatestHeartbeat(defaultHealthyHeartbeatConditionToBeginWith)
+	mu.Unlock()
+
 	heartbeatReporterFunction := func(ctx context.Context) error {
-		currentAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
+		currentAddonInstanceConfiguration, err := getAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
 		if err != nil {
 			return fmt.Errorf("failed to get the AddonInstance configuration corresponding to the Addon '%s': %w", addonName, err)
 		}
 
 		// Heartbeat reporter section: report a heartbeat at an interval ('currentAddonInstanceConfiguration.HeartbeatUpdatePeriod' seconds)
 		for {
-			latestAddonInstanceConfiguration, err := GetAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
-			if err != nil {
-				mgr.GetLogger().Error(err, fmt.Sprintf("failed to get the AddonInstance configuration corresponding to the Addon '%s'", addonName))
+			if err := SendLatestHeartbeat(ctx, r); err != nil {
+				mgr.GetLogger().Error(err, "error occurred while sending the latest heartbeat")
 			}
-			currentAddonInstanceConfiguration = latestAddonInstanceConfiguration
 
-			currentHeartbeatCondition := r.GetLatestHeartbeat()
-			if err := SetAddonInstanceCondition(ctx, mgr.GetClient(), currentHeartbeatCondition, addonName, r.GetAddonTargetNamespace()); err != nil {
-				mgr.GetLogger().Error(err, "error occurred while setting the condition", "HeartbeatCondition", fmt.Sprintf("%+v", currentHeartbeatCondition))
-				// waiting for heartbeat update period for executing the next iteration
-				<-time.After(currentAddonInstanceConfiguration.HeartbeatUpdatePeriod.Duration)
-				continue
+			latestAddonInstanceConfiguration, err := getAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
+			if err != nil {
+				// TODO(ykukreja): report error instead and stop the heartbeat reporter loop? (instead of `return`, write `stop <- err`)
+				mgr.GetLogger().Error(err, fmt.Sprintf("failed to get the AddonInstance configuration corresponding to the Addon '%s'", addonName))
+			} else {
+				currentAddonInstanceConfiguration = latestAddonInstanceConfiguration
 			}
 
 			// waiting for heartbeat update period for executing the next iteration
@@ -89,7 +119,7 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager) erro
 	return nil
 }
 
-func GetAddonInstanceConfiguration(ctx context.Context, cacheBackedKubeClient client.Client, addonName string, targetNamespace string) (addonsv1alpha1.AddonInstanceSpec, error) {
+func getAddonInstanceConfiguration(ctx context.Context, cacheBackedKubeClient client.Client, addonName string, targetNamespace string) (addonsv1alpha1.AddonInstanceSpec, error) {
 	addonInstance, err := getAddonInstanceByAddon(ctx, cacheBackedKubeClient, addonName, targetNamespace)
 	if err != nil {
 		return addonsv1alpha1.AddonInstanceSpec{}, fmt.Errorf("failed to fetch AddonInstance by the addon '%s': %w", addonName, err)

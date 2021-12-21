@@ -15,8 +15,6 @@ import (
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	addonsv1apis "github.com/openshift/addon-operator/apis"
 )
 
 type AddonInstanceReconciler struct {
@@ -28,9 +26,6 @@ type AddonInstanceReconciler struct {
 }
 
 func SetupAddonInstanceConfigurationChangeWatcher(mgr ctrl.Manager, addonReconciler ReconcilerWithHeartbeat) error {
-
-	_ = addonsv1apis.AddToScheme(mgr.GetScheme())
-
 	r := &AddonInstanceReconciler{
 		Client:                                  mgr.GetClient(),
 		log:                                     ctrl.Log.WithName("controllers").WithName("AddonInstanceWatcher-" + addonReconciler.GetAddonName()),

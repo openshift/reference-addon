@@ -79,27 +79,47 @@ func SetupHeartbeatReporter(r ReconcilerWithHeartbeat, mgr manager.Manager) erro
 	mu.Unlock()
 
 	heartbeatReporterFunction := func(ctx context.Context) error {
+		var addonInstanceConfigurationMutex sync.Mutex
+
 		currentAddonInstanceConfiguration, err := getAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
 		if err != nil {
 			return fmt.Errorf("failed to get the AddonInstance configuration corresponding to the Addon '%s': %w", addonName, err)
 		}
 
+		stop := make(chan error)
+		defer close(stop)
+
 		// Heartbeat reporter section: report a heartbeat at an interval ('currentAddonInstanceConfiguration.HeartbeatUpdatePeriod' seconds)
+		// 1. Each iteration spins up a go-routine, where that go-routine (concurrently) sends the heartbeat and syncs the 'currentAddonInstanceConfiguration' with the latest one.
+		// 2. Spinning up go-routines here because that would end up ensuring that the for-loop runs almost exactly at a periodic rate of 'current heartbeatUpdatePeriod' seconds,
+		// instead of running at a rate of (current heartbeatUpdatePeriod + time to send latest heartbeat + time to sync `currentAddonInstanceConfiguration` with latest one) seconds.
 		for {
-			if err := SendLatestHeartbeat(ctx, r); err != nil {
-				mgr.GetLogger().Error(err, "error occurred while sending the latest heartbeat")
-			}
+			go func(stop chan error) {
+				if err := SendLatestHeartbeat(ctx, r); err != nil {
+					mgr.GetLogger().Error(err, "error occurred while sending the latest heartbeat")
+				}
 
-			latestAddonInstanceConfiguration, err := getAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
-			if err != nil {
-				// TODO(ykukreja): report error instead and stop the heartbeat reporter loop? (instead of `return`, write `stop <- err`)
-				mgr.GetLogger().Error(err, fmt.Sprintf("failed to get the AddonInstance configuration corresponding to the Addon '%s'", addonName))
-			} else {
+				addonInstanceConfigurationMutex.Lock()
+				defer addonInstanceConfigurationMutex.Unlock()
+
+				latestAddonInstanceConfiguration, err := getAddonInstanceConfiguration(ctx, mgr.GetClient(), addonName, r.GetAddonTargetNamespace())
+				if err != nil {
+					// TODO(ykukreja): report error instead and stop the heartbeat reporter loop? (instead of `return`, write `stop <- err`)
+					mgr.GetLogger().Error(err, fmt.Sprintf("failed to get the AddonInstance configuration corresponding to the Addon '%s'", addonName))
+					return
+				}
 				currentAddonInstanceConfiguration = latestAddonInstanceConfiguration
-			}
+			}(stop)
 
-			// waiting for heartbeat update period for executing the next iteration
-			<-time.After(currentAddonInstanceConfiguration.HeartbeatUpdatePeriod.Duration)
+			select {
+			// stop this heartbeat reporter loop if any of the above go-routines endup raising an error/exit
+			case err := <-stop:
+				mgr.GetLogger().Error(err, "failed to report certain heartbeats")
+				return err
+			default:
+				// waiting for heartbeat update period for executing the next iteration
+				<-time.After(currentAddonInstanceConfiguration.HeartbeatUpdatePeriod.Duration)
+			}
 		}
 	}
 

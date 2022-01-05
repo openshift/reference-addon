@@ -1,0 +1,24 @@
+apiVersion: addons.managed.openshift.io/v1alpha1
+kind: Addon
+metadata:
+  name: reference-addon
+spec:
+  displayName: An amazing example reference addon!
+  namespaces:
+  - name: reference-addon
+  install:
+    type: OLMOwnNamespace
+    olmOwnNamespace:
+      namespace: reference-addon
+      packageName: reference-addon
+      channel: alpha
+      catalogSourceImage: <reference-addon-image-with-sha-digest>
+  upgradePolicy:
+    id: 123-456-789
+  monitoring:
+    federation:
+      namespace: "reference-addon"
+      matchNames:
+      - reference_addon_foos_per_second
+      matchLabels:
+        prometheus: reference-addon

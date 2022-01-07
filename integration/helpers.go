@@ -36,7 +36,7 @@ import (
 
 const (
 	RelativeConfigDeployPath = "../config/deploy"
-	RelativeConfigAddonPath  = "../config/deploy/webhook"
+	RelativeConfigAddonPath  = "../config/addon"
 )
 
 var (

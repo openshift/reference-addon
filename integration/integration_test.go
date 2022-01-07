@@ -17,11 +17,13 @@ type integrationTestSuite struct {
 }
 
 func (s *integrationTestSuite) SetupSuite() {
-	s.Setup()
+	// TODO(ykukreja): uncomment the following line once the support of setup/teardown of local registry is established
+	//s.Setup()
 }
 
 func (s *integrationTestSuite) TearDownSuite() {
-	s.Teardown()
+	// TODO(ykukreja): uncomment the following line once the support of setup/teardown of local registry is established
+	//s.Teardown()
 }
 
 func (s *integrationTestSuite) referenceAddonCleanup(addon *referenceaddonv1alpha1.ReferenceAddon,

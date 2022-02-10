@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -22,9 +21,7 @@ type StatusReporter struct {
 	client kubeClient
 	config StatusReporterConfig
 
-	stopped  bool
-	stopLock sync.RWMutex
-
+	doneCh           chan struct{}
 	ticker           *time.Ticker
 	tickerInterval   time.Duration
 	latestConditions []metav1.Condition
@@ -83,9 +80,8 @@ const defaultTickerInterval = time.Hour
 
 func NewStatusReporter(client kubeClient, opts ...StatusReporterOption) *StatusReporter {
 	r := &StatusReporter{
-		ticker:         time.NewTicker(defaultTickerInterval),
-		tickerInterval: defaultTickerInterval,
-		updateCh:       make(chan updateEvent),
+		doneCh:   make(chan struct{}),
+		updateCh: make(chan updateEvent),
 	}
 	for _, opt := range opts {
 		opt.ApplyToStatusReporter(&r.config)
@@ -97,28 +93,27 @@ func NewStatusReporter(client kubeClient, opts ...StatusReporterOption) *StatusR
 // Needs to be setup with an external watcher for the AddonInstance API to
 // inform this reporter about changes to the AddonInstance.Spec.
 func (r *StatusReporter) HandleAddonInstanceUpdate(addonInstance *addonsv1alpha1.AddonInstance) error {
-	r.stopLock.RLock()
-	if r.stopped {
+	select {
+	case r.updateCh <- updateEvent{interval: addonInstance.Spec.HeartbeatUpdatePeriod.Duration}:
+	case <-r.doneCh:
 		// we expect this method to be called by a reconciler/watcher via a queue
 		// there is no need to requeue something when we are shutting down
 		// so we don't return an error here.
 		return nil
 	}
-	r.stopLock.RUnlock()
-
-	// DeepCopy to make sure we don't share a pointer across goroutines.
-	r.updateCh <- updateEvent{interval: addonInstance.Spec.HeartbeatUpdatePeriod.Duration}
 	return nil
 }
 
 // SetConditions will override conditions of an AddonInstance to report new status.
 func (r *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
-	r.stopLock.RLock()
-	if !r.stopped {
-		// make sure the next ticker cycle will use updated conditions
-		r.updateCh <- updateEvent{conditions: conditions}
+	select {
+	case <-r.doneCh:
+		// still send an update to the api server,
+		// but no need to update the worker because it's already done.
+	case r.updateCh <- updateEvent{conditions: conditions}:
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	r.stopLock.RUnlock()
 
 	if err := updateAddonInstance(ctx, r.client, types.NamespacedName{
 		Name:      r.config.addonName,
@@ -131,23 +126,11 @@ func (r *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.
 
 // Implementing controller-runtime Runnable interface
 func (r *StatusReporter) Start(ctx context.Context) error {
-	defer func() {
-		r.stopLock.Lock()
-		r.stopped = true
-		r.stopLock.Unlock()
-
-		// stop ticker
-		if r.ticker != nil {
-			r.ticker.Stop()
-		}
-
-		// drain and close updateCh
-		go func() {
-			for range r.updateCh {
-			}
-		}()
-		close(r.updateCh)
-	}()
+	defer close(r.updateCh)
+	r.ticker = time.NewTicker(defaultTickerInterval)
+	defer r.ticker.Stop()
+	r.tickerInterval = defaultTickerInterval
+	defer close(r.doneCh)
 
 	for {
 		select {

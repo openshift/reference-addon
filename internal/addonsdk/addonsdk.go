@@ -77,9 +77,6 @@ type updateEvent struct {
 	conditions []metav1.Condition
 }
 
-// Start with some very long interval, so we don't have to lazy initialize the ticker.
-const defaultTickerInterval = time.Hour
-
 func NewStatusReporter(client kubeClient, opts ...StatusReporterOption) *StatusReporter {
 	r := &StatusReporter{
 		doneCh:   make(chan struct{}),
@@ -114,6 +111,7 @@ func (r *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.
 		// but no need to update the worker because it's already done.
 	case r.updateCh <- updateEvent{conditions: conditions}:
 	case <-ctx.Done():
+		// canceled
 		return ctx.Err()
 	}
 
@@ -126,12 +124,19 @@ func (r *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.
 	return nil
 }
 
+// Start with some very long interval, so we don't have to lazy initialize the ticker.
+const defaultTickerInterval = time.Hour
+
 // Implementing controller-runtime Runnable interface
 func (r *StatusReporter) Start(ctx context.Context) error {
+	// close the update channel last,
+	// so concurrent senders will already read from the closed done
 	defer close(r.updateCh)
+
+	r.tickerInterval = defaultTickerInterval
 	r.ticker = time.NewTicker(defaultTickerInterval)
 	defer r.ticker.Stop()
-	r.tickerInterval = defaultTickerInterval
+
 	defer close(r.doneCh)
 
 	for {
@@ -140,7 +145,8 @@ func (r *StatusReporter) Start(ctx context.Context) error {
 			// Condition updates
 			if update.conditions != nil {
 				r.latestConditions = update.conditions
-				// reset ticker because
+				// reset ticker because we have just sent an update,
+				// so we can reset the clock.
 				r.ticker.Reset(update.interval)
 			}
 

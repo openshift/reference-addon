@@ -21,7 +21,9 @@ type StatusReporter struct {
 	client kubeClient
 	config StatusReporterConfig
 
-	doneCh           chan struct{}
+	// doneCh will be closed when the main worker is shut down
+	doneCh chan struct{}
+
 	ticker           *time.Ticker
 	tickerInterval   time.Duration
 	latestConditions []metav1.Condition

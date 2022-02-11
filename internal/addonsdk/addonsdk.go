@@ -31,23 +31,23 @@ type StatusReporter struct {
 }
 
 var (
-	_ StatusReporterOption = (AddonName)("")
-	_ StatusReporterOption = (AddonNamespace)("")
+	_ StatusReporterOption = (WithAddonName)("")
+	_ StatusReporterOption = (WithAddonNamespace)("")
 )
 
 type StatusReporterOption interface {
 	ApplyToStatusReporter(c *StatusReporterConfig)
 }
 
-type AddonName string
+type WithAddonName string
 
-func (n AddonName) ApplyToStatusReporter(c *StatusReporterConfig) {
+func (n WithAddonName) ApplyToStatusReporter(c *StatusReporterConfig) {
 	c.addonName = string(n)
 }
 
-type AddonNamespace string
+type WithAddonNamespace string
 
-func (n AddonNamespace) ApplyToStatusReporter(c *StatusReporterConfig) {
+func (n WithAddonNamespace) ApplyToStatusReporter(c *StatusReporterConfig) {
 	c.addonNamespace = string(n)
 }
 
@@ -75,6 +75,10 @@ func (c *StatusReporterConfig) Default() {
 type updateEvent struct {
 	interval   time.Duration
 	conditions []metav1.Condition
+}
+
+func test() {
+	NewStatusReporter(nil, WithAddonNamespace("xxx"), WithAddonName("xxx"))
 }
 
 func NewStatusReporter(client kubeClient, opts ...StatusReporterOption) *StatusReporter {
@@ -105,27 +109,25 @@ func (r *StatusReporter) HandleAddonInstanceUpdate(addonInstance *addonsv1alpha1
 
 // SetConditions will override conditions of an AddonInstance to report new status.
 func (r *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
-	select {
-	case <-r.doneCh:
-		// still send an update to the api server,
-		// but no need to update the worker because it's already done.
-	case r.updateCh <- updateEvent{conditions: conditions}:
-	case <-ctx.Done():
-		// canceled
-		return ctx.Err()
-	}
-
 	if err := updateAddonInstance(ctx, r.client, types.NamespacedName{
 		Name:      r.config.addonName,
 		Namespace: r.config.addonNamespace,
 	}, conditions); err != nil {
 		return err
 	}
+
+	select {
+	case <-r.doneCh:
+		// still send an update to the api server,
+		// but no need to update the worker because it's already done.
+	case r.updateCh <- updateEvent{conditions: conditions}:
+		// case <-ctx.Done():
+		// 	// canceled
+		// 	return ctx.Err()
+	}
+
 	return nil
 }
-
-// Start with some very long interval, so we don't have to lazy initialize the ticker.
-const defaultTickerInterval = time.Hour
 
 // Implementing controller-runtime Runnable interface
 func (r *StatusReporter) Start(ctx context.Context) error {
@@ -133,8 +135,14 @@ func (r *StatusReporter) Start(ctx context.Context) error {
 	// so concurrent senders will already read from the closed done
 	defer close(r.updateCh)
 
-	r.tickerInterval = defaultTickerInterval
-	r.ticker = time.NewTicker(defaultTickerInterval)
+	addonInstance := &addonsv1alpha1.AddonInstance{}
+	if err := client.Get(ctx, key, addonInstance); err != nil {
+		return fmt.Errorf("getting AddonInstance to initialize heartbeat: %w", err)
+	}
+	period := addonInstance.Spec.HeartbeatUpdatePeriod.Duration
+
+	r.tickerInterval = period
+	r.ticker = time.NewTicker(period)
 	defer r.ticker.Stop()
 
 	defer close(r.doneCh)
@@ -147,7 +155,7 @@ func (r *StatusReporter) Start(ctx context.Context) error {
 				r.latestConditions = update.conditions
 				// reset ticker because we have just sent an update,
 				// so we can reset the clock.
-				r.ticker.Reset(update.interval)
+				r.ticker.Reset(r.tickerInterval)
 			}
 
 			// Interval updates
@@ -166,7 +174,8 @@ func (r *StatusReporter) Start(ctx context.Context) error {
 				Name:      r.config.addonName,
 				Namespace: r.config.addonNamespace,
 			}, r.latestConditions); err != nil {
-				return err
+				// only log error don't return
+				// return err
 			}
 
 		case <-ctx.Done():

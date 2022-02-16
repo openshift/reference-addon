@@ -263,10 +263,57 @@ load-reference-addon: build-image-reference-addon-manager
 			--name reference-addon-e2e
 .PHONY: load-reference-addon
 
+
+## Install Reference Addon CRDs in to the currently selected cluster.
+load-reference-addon-crds: generate
+	@for crd in $(wildcard config/deploy/*.openshift.io_*.yaml); do \
+		kubectl apply -f $$crd; \
+	done
+.PHONY: load-reference-addon-crds
+
 # Template deployment
 config/deploy/deployment.yaml: FORCE $(YQ)
 	@yq eval '.spec.template.spec.containers[0].image = "$(REFERENCE_ADDON_MANAGER_IMAGE)"' \
 		config/deploy/deployment.tpl.yaml > config/deploy/deployment.yaml
+
+### Setup the reference addon from scratch with its fundamental resources (Deployments, Roles, etc.)
+setup-reference-addon-from-scratch: load-reference-addon-crds \
+	load-reference-addon \
+	config/deploy/deployment.yaml
+	@(source hack/determine-container-runtime.sh; \
+		kubectl apply -f config/deploy; \
+		echo -e "\nwaiting for deployment/reference-addon..."; \
+		kubectl wait --for=condition=available deployment/reference-addon -n reference-addon --timeout=240s; \
+		echo; \
+	) 2>&1 | sed 's/^/  /'
+
+# Template Addon
+# TODO(ykukreja): shift to making use of image digests here instead of tag. Currently blocked!
+config/addon/reference-addon.yaml: FORCE $(YQ)
+	$(eval IMAGE_NAME := reference-addon-index)
+	@yq eval '.spec.install.olmOwnNamespace.catalogSourceImage = "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}"' \
+		config/addon/reference-addon.tpl.yaml > config/addon/reference-addon.yaml
+
+### TODO(ykukreja): Currently not viable to use. Blocked on the support for having local registry setup.
+### TODO(ykukreja): Add target for recognising and modifying the registry host instead of using quay.io
+setup-reference-addon: | \
+	push-image-reference-addon-index \
+    config/addon/reference-addon.yaml
+
+# make sure that we install our components into the kind cluster and disregard normal $KUBECONFIG
+dev-setup: export KUBECONFIG=$(abspath $(KIND_KUBECONFIG))
+## Setup a local env for feature development. (Kind, OLM, OKD Console)
+dev-setup: | \
+	create-kind-cluster \
+	apply-olm \
+	spply-openshift-console
+.PHONY: dev-setup
+
+## Setup a local env for integration test development. (Kind, OLM, OKD Console, Addon Operator).
+test-setup: | \
+	dev-setup \
+	setup-reference-addon
+.PHONY: test-setup
 
 # Installs OLM (Operator Lifecycle Manager) into the currently selected cluster.
 apply-olm:

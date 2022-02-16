@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	refapis "github.com/openshift/reference-addon/apis"
-	// "github.com/openshift/reference-addon/internal/controllers"
+	"github.com/openshift/reference-addon/internal/controllers"
 )
 
 var (
@@ -92,14 +92,17 @@ func main() {
 		}
 	}
 
-	// if err = (&controllers.AddonReconciler{
-	// 	Client: mgr.GetClient(),
-	// 	Log:    ctrl.Log.WithName("controllers").WithName("Addon"),
-	// 	Scheme: mgr.GetScheme(),
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "Addon")
-	// 	os.Exit(1)
-	// }
+	// the following section hooks up a heartbeat reporter with the current addon/operator
+	r := controllers.ReferenceAddonReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
+		Scheme: mgr.GetScheme(),
+	}
+
+	if err = r.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

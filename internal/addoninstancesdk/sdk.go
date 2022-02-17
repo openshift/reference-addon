@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -81,6 +82,10 @@ func GetAddonInstanceHeartbeatReporterSingleton() (*AddonInstanceHeartbeatReport
 	return addonInstanceHeartbeatReporterSingleton, nil
 }
 
+func (adihrClient AddonInstanceHeartbeatReporter) LatestCondition() metav1.Condition {
+	return adihrClient.latestCondition
+}
+
 func (adihrClient *AddonInstanceHeartbeatReporter) changeRunningState(desiredState bool) {
 	adihrClient.isRunningMutex.Lock()
 	adihrClient.isRunning = desiredState
@@ -117,9 +122,11 @@ func (adihrClient *AddonInstanceHeartbeatReporter) Start(ctx context.Context) er
 
 			// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
 			// synchronize the timer with this new interval
-			if update.newInterval != nil && *update.newInterval != adihrClient.currentInterval {
-				adihrClient.currentInterval = *update.newInterval
-				adihrClient.ticker.Reset(adihrClient.currentInterval)
+			if update.newAddonInstanceSpec != nil {
+				if update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration != adihrClient.currentInterval {
+					adihrClient.currentInterval = update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration
+					adihrClient.ticker.Reset(adihrClient.currentInterval)
+				}
 			}
 		case <-adihrClient.ticker.C:
 			if err := adihrClient.updateAddonInstanceStatus(ctx, adihrClient.latestCondition); err != nil {
@@ -145,6 +152,15 @@ func (adihrClient *AddonInstanceHeartbeatReporter) Stop() error {
 func (adihrClient *AddonInstanceHeartbeatReporter) SendHeartbeat(ctx context.Context, condition metav1.Condition) error {
 	select {
 	case adihrClient.updateCh <- updateOptions{newLatestCondition: &condition}: // near-instantly received by the heartbeat reporter loop
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("found the provided context to be exhausted")
+	}
+}
+
+func (adihrClient *AddonInstanceHeartbeatReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec) error {
+	select {
+	case adihrClient.updateCh <- updateOptions{newAddonInstanceSpec: newAddonInstanceSpec}:
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")

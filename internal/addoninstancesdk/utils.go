@@ -3,14 +3,21 @@ package addoninstancesdk
 import (
 	"context"
 	"fmt"
-	"time"
 
+	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type updateOptions struct {
-	newInterval        *time.Duration
+	// for capturing new changes to the addonInstance which the tenants would be watching
+	// using this instead of `newInterval *time.Duration` so that:
+	// - the client/tenant has to setup a watcher/informer for AddonInstance and just have to straight away input the entire AddonInstance object whenever an update on it is observed
+	// - in the future, if we (SDK developers) expect other inputs associated with other fields of AddonInstance Spec, we won't have to nudge the clients/tenants to update their watcher/informer to start a new bunch of arguments when calling `addoninstancesdk.ReportUpdate(...)`.
+	//      They can still continue to blindly input the newAddonInstanceSpec whenever a change is observed by their informer/watcher and it would be upto our SDK to take decisions on the basis of whether `heartbeatUpdatePeriod` field changed or some other field changed.
+	newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec
+
+	// for capturing new heartbeats/conditions to be reported
 	newLatestCondition *metav1.Condition
 }
 

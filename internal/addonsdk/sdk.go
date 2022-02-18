@@ -6,7 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -38,6 +41,8 @@ type StatusReporter struct {
 	// for effectively communicating the stop and update signals
 	stopperCh chan bool
 	updateCh  chan updateOptions
+
+	log logr.Logger
 }
 
 // ensure that the `StatusReporter` implements the `addonsdk.statusReporterClient` interface
@@ -45,6 +50,12 @@ var _ statusReporterClient = (*StatusReporter)(nil)
 
 // InitializeStatusReporterSingleton sets up a singleton of the type `StatusReporter` (only if it doesn't exist yet) and returns it to the caller.
 func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName string, addonTargetNamespace string) (*StatusReporter, error) {
+
+	zapLog, err := zap.NewProduction()
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize the logger: %+v", err))
+	}
+
 	if statusReporterSingleton == nil {
 		statusReporterSingletonMutex.Lock()
 		defer statusReporterSingletonMutex.Unlock()
@@ -63,6 +74,7 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 				},
 				stopperCh: make(chan bool),
 				updateCh:  make(chan updateOptions),
+				log:       zapr.NewLogger(zapLog),
 			}
 
 			currentAddonInstance := &addonsv1alpha1.AddonInstance{}

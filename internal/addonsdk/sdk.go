@@ -99,15 +99,11 @@ func (sr StatusReporter) LatestCondition() metav1.Condition {
 	return sr.latestCondition
 }
 
-func (sr *StatusReporter) changeRunningState(desiredState bool) {
-	sr.isRunningMutex.Lock()
-	sr.isRunning = desiredState
-	sr.isRunningMutex.Unlock()
-}
-
 func (sr *StatusReporter) Start(ctx context.Context) error {
 	defer func() {
-		sr.changeRunningState(false)
+		sr.isRunningMutex.Lock()
+		sr.isRunning = false
+		sr.isRunningMutex.Unlock()
 	}()
 
 	// not allow the client/tenant to start multiple heartbeat reporter concurrently and cause data races

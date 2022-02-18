@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	addonInstanceHeartbeatReporterSingleton      *AddonInstanceHeartbeatReporter
-	addonInstanceHeartbeatReporterSingletonMutex = &sync.Mutex{}
+	statusReporterSingleton      *StatusReporter
+	statusReporterSingletonMutex = &sync.Mutex{}
 )
 
 // a nice heartbeat-reporter implemented by the MT-SRE which our tenants can use
-// if they don't like it, they can implement their own heartbeat reporter by creating a type which implements the `AddonInstanceStatusReporterClient` interface
-type AddonInstanceHeartbeatReporter struct {
+// if they don't like it, they can implement their own heartbeat reporter by creating a type which implements the `addonsdk.statusReporterClient` interface
+type StatusReporter struct {
 	// object provided by the client/tenants which implements the addonsdk.client interface
 	addonInstanceInteractor client
 	addonName               string
@@ -40,16 +40,16 @@ type AddonInstanceHeartbeatReporter struct {
 	updateCh  chan updateOptions
 }
 
-// ensure that the `AddonInstanceHeartbeatReporter` implements the `AddonInstanceStatusReporterClient` interface
-var _ addonInstanceStatusReporterClient = (*AddonInstanceHeartbeatReporter)(nil)
+// ensure that the `StatusReporter` implements the `addonsdk.statusReporterClient` interface
+var _ statusReporterClient = (*StatusReporter)(nil)
 
-// InitializeAddonInstanceHeartbeatReporterSingleton sets up a singleton of the type `AddonInstanceHeartbeatReporter` (only if it doesn't exist yet) and returns it to the caller.
-func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor client, addonName string, addonTargetNamespace string) (*AddonInstanceHeartbeatReporter, error) {
-	if addonInstanceHeartbeatReporterSingleton == nil {
-		addonInstanceHeartbeatReporterSingletonMutex.Lock()
-		defer addonInstanceHeartbeatReporterSingletonMutex.Unlock()
-		if addonInstanceHeartbeatReporterSingleton == nil {
-			addonInstanceHeartbeatReporterSingleton = &AddonInstanceHeartbeatReporter{
+// InitializeStatusReporterSingleton sets up a singleton of the type `StatusReporter` (only if it doesn't exist yet) and returns it to the caller.
+func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName string, addonTargetNamespace string) (*StatusReporter, error) {
+	if statusReporterSingleton == nil {
+		statusReporterSingletonMutex.Lock()
+		defer statusReporterSingletonMutex.Unlock()
+		if statusReporterSingleton == nil {
+			statusReporterSingleton = &StatusReporter{
 				addonInstanceInteractor: addonInstanceInteractor,
 				addonName:               addonName,
 				addonTargetNamespace:    addonTargetNamespace,
@@ -66,102 +66,102 @@ func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor c
 			}
 
 			currentAddonInstance := &addonsv1alpha1.AddonInstance{}
-			if err := addonInstanceHeartbeatReporterSingleton.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: addonInstanceHeartbeatReporterSingleton.addonTargetNamespace}, currentAddonInstance); err != nil {
+			if err := statusReporterSingleton.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: statusReporterSingleton.addonTargetNamespace}, currentAddonInstance); err != nil {
 				return nil, fmt.Errorf("error occurred while fetching the current heartbeat update period interval")
 			}
-			addonInstanceHeartbeatReporterSingleton.currentInterval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
+			statusReporterSingleton.currentInterval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
 		}
 	}
 
-	return addonInstanceHeartbeatReporterSingleton, nil
+	return statusReporterSingleton, nil
 }
 
-func GetAddonInstanceHeartbeatReporterSingleton() (*AddonInstanceHeartbeatReporter, error) {
-	if addonInstanceHeartbeatReporterSingleton == nil {
-		return nil, fmt.Errorf("heartbeat-reporter not found to be initialised. Initialize it by calling `InitializeAddonInstanceHeartbeatReporterSingleton(...)`")
+func GetStatusReporterSingleton() (*StatusReporter, error) {
+	if statusReporterSingleton == nil {
+		return nil, fmt.Errorf("heartbeat-reporter not found to be initialised. Initialize it by calling `InitializeStatusReporterSingleton(...)`")
 	}
-	return addonInstanceHeartbeatReporterSingleton, nil
+	return statusReporterSingleton, nil
 }
 
-func (adihrClient AddonInstanceHeartbeatReporter) LatestCondition() metav1.Condition {
-	return adihrClient.latestCondition
+func (sr StatusReporter) LatestCondition() metav1.Condition {
+	return sr.latestCondition
 }
 
-func (adihrClient *AddonInstanceHeartbeatReporter) changeRunningState(desiredState bool) {
-	adihrClient.isRunningMutex.Lock()
-	adihrClient.isRunning = desiredState
-	adihrClient.isRunningMutex.Unlock()
+func (sr *StatusReporter) changeRunningState(desiredState bool) {
+	sr.isRunningMutex.Lock()
+	sr.isRunning = desiredState
+	sr.isRunningMutex.Unlock()
 }
 
-func (adihrClient *AddonInstanceHeartbeatReporter) Start(ctx context.Context) error {
+func (sr *StatusReporter) Start(ctx context.Context) error {
 	defer func() {
-		adihrClient.changeRunningState(false)
+		sr.changeRunningState(false)
 	}()
 
 	// not allow the client/tenant to start multiple heartbeat reporter concurrently and cause data races
-	adihrClient.isRunningMutex.Lock()
-	if adihrClient.isRunning {
-		adihrClient.isRunningMutex.Unlock()
+	sr.isRunningMutex.Lock()
+	if sr.isRunning {
+		sr.isRunningMutex.Unlock()
 		return fmt.Errorf("already found the heartbeat reporter to be running")
 	}
-	adihrClient.isRunning = true
-	adihrClient.isRunningMutex.Unlock()
+	sr.isRunning = true
+	sr.isRunningMutex.Unlock()
 
-	adihrClient.ticker = time.NewTicker(adihrClient.currentInterval)
-	defer adihrClient.ticker.Stop()
+	sr.ticker = time.NewTicker(sr.currentInterval)
+	defer sr.ticker.Stop()
 
 	for {
 		select {
-		case update := <-adihrClient.updateCh:
+		case update := <-sr.updateCh:
 			if update.newLatestCondition != nil {
 				// immediately register a new heartbeat upon receive one from the client/tenant side
-				if err := adihrClient.updateAddonInstanceStatus(ctx, *update.newLatestCondition); err != nil {
+				if err := sr.updateAddonInstanceStatus(ctx, *update.newLatestCondition); err != nil {
 					return fmt.Errorf("failed to update the addoninstance status: %w", err)
 				}
-				adihrClient.latestCondition = *update.newLatestCondition
+				sr.latestCondition = *update.newLatestCondition
 			}
 
 			// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
 			// synchronize the timer with this new interval
 			if update.newAddonInstanceSpec != nil {
-				if update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration != adihrClient.currentInterval {
-					adihrClient.currentInterval = update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration
-					adihrClient.ticker.Reset(adihrClient.currentInterval)
+				if update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
+					sr.currentInterval = update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration
+					sr.ticker.Reset(sr.currentInterval)
 				}
 			}
-		case <-adihrClient.ticker.C:
-			if err := adihrClient.updateAddonInstanceStatus(ctx, adihrClient.latestCondition); err != nil {
+		case <-sr.ticker.C:
+			if err := sr.updateAddonInstanceStatus(ctx, sr.latestCondition); err != nil {
 				return fmt.Errorf("failed to report the regular heartbeat: %w", err)
 			}
 		case <-ctx.Done():
 			return fmt.Errorf("provided context exhausted")
-		case <-adihrClient.stopperCh:
+		case <-sr.stopperCh:
 			return nil
 		}
 	}
 }
 
-func (adihrClient *AddonInstanceHeartbeatReporter) Stop() error {
+func (sr *StatusReporter) Stop() error {
 	select {
-	case adihrClient.stopperCh <- true:
+	case sr.stopperCh <- true:
 		return nil
 	case <-time.After(30 * time.Second):
 		return fmt.Errorf("failed to stop the reporter: timed out waiting for the reporter to ack the stop signal")
 	}
 }
 
-func (adihrClient *AddonInstanceHeartbeatReporter) SendHeartbeat(ctx context.Context, condition metav1.Condition) error {
+func (sr *StatusReporter) SendHeartbeat(ctx context.Context, condition metav1.Condition) error {
 	select {
-	case adihrClient.updateCh <- updateOptions{newLatestCondition: &condition}: // near-instantly received by the heartbeat reporter loop
+	case sr.updateCh <- updateOptions{newLatestCondition: &condition}: // near-instantly received by the heartbeat reporter loop
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")
 	}
 }
 
-func (adihrClient *AddonInstanceHeartbeatReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec) error {
+func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec) error {
 	select {
-	case adihrClient.updateCh <- updateOptions{newAddonInstanceSpec: newAddonInstanceSpec}:
+	case sr.updateCh <- updateOptions{newAddonInstanceSpec: newAddonInstanceSpec}:
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")

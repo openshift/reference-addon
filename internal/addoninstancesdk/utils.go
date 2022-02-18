@@ -7,6 +7,7 @@ import (
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type updateOptions struct {
@@ -22,11 +23,10 @@ type updateOptions struct {
 }
 
 func (adihrClient *AddonInstanceHeartbeatReporter) updateAddonInstanceStatus(ctx context.Context, condition metav1.Condition) error {
-	addonInstance, err := adihrClient.AddonInstanceInteractor.GetAddonInstance(ctx, "addon-instance", adihrClient.AddonTargetNamespace)
-	if err != nil {
+	addonInstance := &addonsv1alpha1.AddonInstance{}
+	if err := adihrClient.AddonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: adihrClient.AddonTargetNamespace}, addonInstance); err != nil {
 		return fmt.Errorf("failed to get the AddonInstance: %w", err)
 	}
-
 	currentTime := metav1.Now()
 	if condition.LastTransitionTime.IsZero() {
 		condition.LastTransitionTime = currentTime

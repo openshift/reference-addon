@@ -8,6 +8,7 @@ import (
 
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -64,8 +65,8 @@ func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor a
 				updateCh:  make(chan updateOptions),
 			}
 
-			currentAddonInstance, err := addonInstanceHeartbeatReporterSingleton.AddonInstanceInteractor.GetAddonInstance(context.TODO(), "addon-instance", addonInstanceHeartbeatReporterSingleton.AddonTargetNamespace)
-			if err != nil {
+			currentAddonInstance := &addonsv1alpha1.AddonInstance{}
+			if err := addonInstanceHeartbeatReporterSingleton.AddonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: addonInstanceHeartbeatReporterSingleton.AddonTargetNamespace}, currentAddonInstance); err != nil {
 				return nil, fmt.Errorf("error occurred while fetching the current heartbeat update period interval")
 			}
 			addonInstanceHeartbeatReporterSingleton.currentInterval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration

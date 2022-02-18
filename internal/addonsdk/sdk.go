@@ -20,9 +20,9 @@ var (
 // if they don't like it, they can implement their own heartbeat reporter by creating a type which implements the `AddonInstanceStatusReporterClient` interface
 type AddonInstanceHeartbeatReporter struct {
 	// object provided by the client/tenants which implements the addonsdk.client interface
-	AddonInstanceInteractor client
-	AddonName               string
-	AddonTargetNamespace    string
+	addonInstanceInteractor client
+	addonName               string
+	addonTargetNamespace    string
 
 	// to "concurrent-safely" track whether there's a heartbeat reporter running or not
 	isRunning      bool
@@ -50,9 +50,9 @@ func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor c
 		defer addonInstanceHeartbeatReporterSingletonMutex.Unlock()
 		if addonInstanceHeartbeatReporterSingleton == nil {
 			addonInstanceHeartbeatReporterSingleton = &AddonInstanceHeartbeatReporter{
-				AddonInstanceInteractor: addonInstanceInteractor,
-				AddonName:               addonName,
-				AddonTargetNamespace:    addonTargetNamespace,
+				addonInstanceInteractor: addonInstanceInteractor,
+				addonName:               addonName,
+				addonTargetNamespace:    addonTargetNamespace,
 				isRunning:               false,
 				isRunningMutex:          &sync.Mutex{},
 				latestCondition: metav1.Condition{
@@ -66,7 +66,7 @@ func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor c
 			}
 
 			currentAddonInstance := &addonsv1alpha1.AddonInstance{}
-			if err := addonInstanceHeartbeatReporterSingleton.AddonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: addonInstanceHeartbeatReporterSingleton.AddonTargetNamespace}, currentAddonInstance); err != nil {
+			if err := addonInstanceHeartbeatReporterSingleton.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: addonInstanceHeartbeatReporterSingleton.addonTargetNamespace}, currentAddonInstance); err != nil {
 				return nil, fmt.Errorf("error occurred while fetching the current heartbeat update period interval")
 			}
 			addonInstanceHeartbeatReporterSingleton.currentInterval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration

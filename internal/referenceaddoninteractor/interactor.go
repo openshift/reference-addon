@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
-	"github.com/openshift/reference-addon/internal/addoninstancesdk"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,9 +23,6 @@ var (
 type ReferenceAddonInteractor struct {
 	Client dynamic.Interface
 }
-
-// ensure that ReferenceAddonInteractor implements AddonInstanceInteractorClient interface
-var _ addoninstancesdk.AddonInstanceInteractorClient = (*ReferenceAddonInteractor)(nil)
 
 func InitializeReferenceAddonInteractorSingleton(kubeConfigAbsolutePath string) (ReferenceAddonInteractor, error) {
 	if referenceAddonInteractorSingleton == nil {

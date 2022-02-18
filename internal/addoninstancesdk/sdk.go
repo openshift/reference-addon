@@ -19,7 +19,7 @@ var (
 // if they don't like it, they can implement their own heartbeat reporter by creating a type which implements the `AddonInstanceStatusReporterClient` interface
 type AddonInstanceHeartbeatReporter struct {
 	// object provided by the client/tenants which implements the AddonInstanceInteractorClient interface
-	AddonInstanceInteractor AddonInstanceInteractorClient
+	AddonInstanceInteractor addonInstanceInteractorClient
 	AddonName               string
 	AddonTargetNamespace    string
 
@@ -40,10 +40,10 @@ type AddonInstanceHeartbeatReporter struct {
 }
 
 // ensure that the `AddonInstanceHeartbeatReporter` implements the `AddonInstanceStatusReporterClient` interface
-var _ AddonInstanceStatusReporterClient = (*AddonInstanceHeartbeatReporter)(nil)
+var _ addonInstanceStatusReporterClient = (*AddonInstanceHeartbeatReporter)(nil)
 
 // InitializeAddonInstanceHeartbeatReporterSingleton sets up a singleton of the type `AddonInstanceHeartbeatReporter` (only if it doesn't exist yet) and returns it to the caller.
-func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor AddonInstanceInteractorClient, addonName string, addonTargetNamespace string) (*AddonInstanceHeartbeatReporter, error) {
+func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor addonInstanceInteractorClient, addonName string, addonTargetNamespace string) (*AddonInstanceHeartbeatReporter, error) {
 	if addonInstanceHeartbeatReporterSingleton == nil {
 		addonInstanceHeartbeatReporterSingletonMutex.Lock()
 		defer addonInstanceHeartbeatReporterSingletonMutex.Unlock()

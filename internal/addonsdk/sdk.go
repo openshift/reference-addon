@@ -125,14 +125,6 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 	for {
 		select {
 		case update := <-sr.updateCh:
-			if update.newLatestCondition != nil {
-				// immediately register a new heartbeat upon receive one from the client/tenant side
-				if err := sr.updateAddonInstanceStatus(ctx, *update.newLatestCondition); err != nil {
-					return fmt.Errorf("failed to update the addoninstance status: %w", err)
-				}
-				sr.latestCondition = *update.newLatestCondition
-			}
-
 			// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
 			// synchronize the timer with this new interval
 			if update.newAddonInstanceSpec != nil {
@@ -141,9 +133,18 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 					sr.ticker.Reset(sr.currentInterval)
 				}
 			}
+
+			if update.newLatestCondition != nil {
+				// immediately register a new heartbeat upon receive one from the client/tenant side
+				if err := sr.updateAddonInstanceStatus(ctx, *update.newLatestCondition); err != nil {
+					sr.log.Error(err, "failed to update the addoninstance status")
+					continue
+				}
+				sr.latestCondition = *update.newLatestCondition
+			}
 		case <-sr.ticker.C:
 			if err := sr.updateAddonInstanceStatus(ctx, sr.latestCondition); err != nil {
-				return fmt.Errorf("failed to report the regular heartbeat: %w", err)
+				sr.log.Error(err, "failed to report the regular heartbeat")
 			}
 		case <-ctx.Done():
 			return fmt.Errorf("provided context exhausted")

@@ -19,8 +19,8 @@ var (
 // a nice heartbeat-reporter implemented by the MT-SRE which our tenants can use
 // if they don't like it, they can implement their own heartbeat reporter by creating a type which implements the `AddonInstanceStatusReporterClient` interface
 type AddonInstanceHeartbeatReporter struct {
-	// object provided by the client/tenants which implements the AddonInstanceInteractorClient interface
-	AddonInstanceInteractor addonInstanceInteractorClient
+	// object provided by the client/tenants which implements the addoninstancesdk.client interface
+	client client
 	AddonName               string
 	AddonTargetNamespace    string
 
@@ -44,13 +44,13 @@ type AddonInstanceHeartbeatReporter struct {
 var _ addonInstanceStatusReporterClient = (*AddonInstanceHeartbeatReporter)(nil)
 
 // InitializeAddonInstanceHeartbeatReporterSingleton sets up a singleton of the type `AddonInstanceHeartbeatReporter` (only if it doesn't exist yet) and returns it to the caller.
-func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor addonInstanceInteractorClient, addonName string, addonTargetNamespace string) (*AddonInstanceHeartbeatReporter, error) {
+func InitializeAddonInstanceHeartbeatReporterSingleton(client client, addonName string, addonTargetNamespace string) (*AddonInstanceHeartbeatReporter, error) {
 	if addonInstanceHeartbeatReporterSingleton == nil {
 		addonInstanceHeartbeatReporterSingletonMutex.Lock()
 		defer addonInstanceHeartbeatReporterSingletonMutex.Unlock()
 		if addonInstanceHeartbeatReporterSingleton == nil {
 			addonInstanceHeartbeatReporterSingleton = &AddonInstanceHeartbeatReporter{
-				AddonInstanceInteractor: addonInstanceInteractor,
+				client: client,
 				AddonName:               addonName,
 				AddonTargetNamespace:    addonTargetNamespace,
 				isRunning:               false,
@@ -66,7 +66,7 @@ func InitializeAddonInstanceHeartbeatReporterSingleton(addonInstanceInteractor a
 			}
 
 			currentAddonInstance := &addonsv1alpha1.AddonInstance{}
-			if err := addonInstanceHeartbeatReporterSingleton.AddonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: addonInstanceHeartbeatReporterSingleton.AddonTargetNamespace}, currentAddonInstance); err != nil {
+			if err := addonInstanceHeartbeatReporterSingleton.client.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: addonInstanceHeartbeatReporterSingleton.AddonTargetNamespace}, currentAddonInstance); err != nil {
 				return nil, fmt.Errorf("error occurred while fetching the current heartbeat update period interval")
 			}
 			addonInstanceHeartbeatReporterSingleton.currentInterval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration

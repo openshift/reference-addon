@@ -24,7 +24,7 @@ type updateOptions struct {
 
 func (adihrClient *AddonInstanceHeartbeatReporter) updateAddonInstanceStatus(ctx context.Context, condition metav1.Condition) error {
 	addonInstance := &addonsv1alpha1.AddonInstance{}
-	if err := adihrClient.AddonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: adihrClient.AddonTargetNamespace}, addonInstance); err != nil {
+	if err := adihrClient.client.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: adihrClient.AddonTargetNamespace}, addonInstance); err != nil {
 		return fmt.Errorf("failed to get the AddonInstance: %w", err)
 	}
 	currentTime := metav1.Now()
@@ -36,7 +36,7 @@ func (adihrClient *AddonInstanceHeartbeatReporter) updateAddonInstanceStatus(ctx
 	addonInstance.Status.ObservedGeneration = (*addonInstance).Generation
 	addonInstance.Status.LastHeartbeatTime = metav1.Now()
 
-	if err := adihrClient.AddonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
+	if err := adihrClient.client.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
 		return fmt.Errorf("failed to set AddonInstance's Condition: %w", err)
 	}
 	return nil

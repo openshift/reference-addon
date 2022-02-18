@@ -1,4 +1,4 @@
-package addoninstancesdk
+package addonsdk
 
 import (
 	"context"

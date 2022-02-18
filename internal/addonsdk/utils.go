@@ -1,4 +1,4 @@
-package addoninstancesdk
+package addonsdk
 
 import (
 	"context"
@@ -14,7 +14,7 @@ type updateOptions struct {
 	// for capturing new changes to the addonInstance which the tenants would be watching
 	// using this instead of `newInterval *time.Duration` so that:
 	// - the client/tenant has to setup a watcher/informer for AddonInstance and just have to straight away input the entire AddonInstance object whenever an update on it is observed
-	// - in the future, if we (SDK developers) expect other inputs associated with other fields of AddonInstance Spec, we won't have to nudge the clients/tenants to update their watcher/informer to start a new bunch of arguments when calling `addoninstancesdk.ReportUpdate(...)`.
+	// - in the future, if we (SDK developers) expect other inputs associated with other fields of AddonInstance Spec, we won't have to nudge the clients/tenants to update their watcher/informer to start a new bunch of arguments when calling `addonsdk.ReportUpdate(...)`.
 	//      They can still continue to blindly input the newAddonInstanceSpec whenever a change is observed by their informer/watcher and it would be upto our SDK to take decisions on the basis of whether `heartbeatUpdatePeriod` field changed or some other field changed.
 	newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec
 
@@ -24,7 +24,7 @@ type updateOptions struct {
 
 func (adihrClient *AddonInstanceHeartbeatReporter) updateAddonInstanceStatus(ctx context.Context, condition metav1.Condition) error {
 	addonInstance := &addonsv1alpha1.AddonInstance{}
-	if err := adihrClient.client.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: adihrClient.AddonTargetNamespace}, addonInstance); err != nil {
+	if err := adihrClient.AddonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: adihrClient.AddonTargetNamespace}, addonInstance); err != nil {
 		return fmt.Errorf("failed to get the AddonInstance: %w", err)
 	}
 	currentTime := metav1.Now()
@@ -36,7 +36,7 @@ func (adihrClient *AddonInstanceHeartbeatReporter) updateAddonInstanceStatus(ctx
 	addonInstance.Status.ObservedGeneration = (*addonInstance).Generation
 	addonInstance.Status.LastHeartbeatTime = metav1.Now()
 
-	if err := adihrClient.client.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
+	if err := adihrClient.AddonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
 		return fmt.Errorf("failed to set AddonInstance's Condition: %w", err)
 	}
 	return nil

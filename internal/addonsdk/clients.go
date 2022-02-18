@@ -18,6 +18,6 @@ type client interface {
 
 // if the tenant wants a super-custom way to report heartbeats or just like DIY stuff, they can implement their own `AddonInstanceReporterClient` and utilise it
 type statusReporterClient interface {
-	Start(ctx context.Context) error
+	Start(ctx context.Context)
 	SendHeartbeat(ctx context.Context, condition metav1.Condition) error
 }

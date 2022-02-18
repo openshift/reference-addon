@@ -28,8 +28,7 @@ type StatusReporter struct {
 	addonTargetNamespace    string
 
 	// to "concurrent-safely" track whether there's a heartbeat reporter running or not
-	isRunning      bool
-	isRunningMutex *sync.Mutex
+	isRunning bool
 
 	// the latest condition which the heartbeat reporter would be reporting the periodically
 	latestCondition metav1.Condition
@@ -41,6 +40,9 @@ type StatusReporter struct {
 	// for effectively communicating the stop and update signals
 	stopperCh chan bool
 	updateCh  chan updateOptions
+
+	// for concurrency-safely executing one instance of heartbeat reporter loop
+	executeOnce sync.Once
 
 	log logr.Logger
 }
@@ -65,7 +67,6 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 				addonName:               addonName,
 				addonTargetNamespace:    addonTargetNamespace,
 				isRunning:               false,
-				isRunningMutex:          &sync.Mutex{},
 				latestCondition: metav1.Condition{
 					Type:    "addons.managed.openshift.io/Healthy",
 					Status:  "False",
@@ -99,55 +100,48 @@ func (sr StatusReporter) LatestCondition() metav1.Condition {
 	return sr.latestCondition
 }
 
-func (sr *StatusReporter) Start(ctx context.Context) error {
-	defer func() {
-		sr.isRunningMutex.Lock()
-		sr.isRunning = false
-		sr.isRunningMutex.Unlock()
-	}()
+func (sr *StatusReporter) Start(ctx context.Context) {
+	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
+	sr.executeOnce.Do(func() {
+		defer func() {
+			sr.ticker.Stop()
+			sr.isRunning = false
+		}()
 
-	// not allow the client/tenant to start multiple heartbeat reporter concurrently and cause data races
-	sr.isRunningMutex.Lock()
-	if sr.isRunning {
-		sr.isRunningMutex.Unlock()
-		return fmt.Errorf("already found the heartbeat reporter to be running")
-	}
-	sr.isRunning = true
-	sr.isRunningMutex.Unlock()
+		sr.isRunning = true
+		sr.ticker = time.NewTicker(sr.currentInterval)
 
-	sr.ticker = time.NewTicker(sr.currentInterval)
-	defer sr.ticker.Stop()
-
-	for {
-		select {
-		case update := <-sr.updateCh:
-			// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
-			// synchronize the timer with this new interval
-			if update.newAddonInstanceSpec != nil {
-				if update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
-					sr.currentInterval = update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration
-					sr.ticker.Reset(sr.currentInterval)
+		for {
+			select {
+			case update := <-sr.updateCh:
+				// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
+				// synchronize the timer with this new interval
+				if update.newAddonInstanceSpec != nil {
+					if update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
+						sr.currentInterval = update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration
+						sr.ticker.Reset(sr.currentInterval)
+					}
 				}
-			}
 
-			if update.newLatestCondition != nil {
-				// immediately register a new heartbeat upon receive one from the client/tenant side
-				if err := sr.updateAddonInstanceStatus(ctx, *update.newLatestCondition); err != nil {
-					sr.log.Error(err, "failed to update the addoninstance status")
-					continue
+				if update.newLatestCondition != nil {
+					// immediately register a new heartbeat upon receive one from the client/tenant side
+					if err := sr.updateAddonInstanceStatus(ctx, *update.newLatestCondition); err != nil {
+						sr.log.Error(err, "failed to update the addoninstance status")
+						continue
+					}
+					sr.latestCondition = *update.newLatestCondition
 				}
-				sr.latestCondition = *update.newLatestCondition
+			case <-sr.ticker.C:
+				if err := sr.updateAddonInstanceStatus(ctx, sr.latestCondition); err != nil {
+					sr.log.Error(err, "failed to report the regular heartbeat")
+				}
+			case <-ctx.Done():
+				return
+			case <-sr.stopperCh:
+				return
 			}
-		case <-sr.ticker.C:
-			if err := sr.updateAddonInstanceStatus(ctx, sr.latestCondition); err != nil {
-				sr.log.Error(err, "failed to report the regular heartbeat")
-			}
-		case <-ctx.Done():
-			return fmt.Errorf("provided context exhausted")
-		case <-sr.stopperCh:
-			return nil
 		}
-	}
+	})
 }
 
 func (sr *StatusReporter) Stop() error {

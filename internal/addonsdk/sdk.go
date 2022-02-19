@@ -27,9 +27,6 @@ type StatusReporter struct {
 	addonName               string
 	addonTargetNamespace    string
 
-	// to "concurrent-safely" track whether there's a heartbeat reporter running or not
-	isRunning bool
-
 	// the latest condition which the heartbeat reporter would be reporting the periodically
 	latestCondition metav1.Condition
 
@@ -66,7 +63,6 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 				addonInstanceInteractor: addonInstanceInteractor,
 				addonName:               addonName,
 				addonTargetNamespace:    addonTargetNamespace,
-				isRunning:               false,
 				latestCondition: metav1.Condition{
 					Type:    "addons.managed.openshift.io/Healthy",
 					Status:  "False",
@@ -103,12 +99,7 @@ func (sr StatusReporter) LatestCondition() metav1.Condition {
 func (sr *StatusReporter) Start(ctx context.Context) {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	sr.executeOnce.Do(func() {
-		defer func() {
-			sr.ticker.Stop()
-			sr.isRunning = false
-		}()
-
-		sr.isRunning = true
+		defer sr.ticker.Stop()
 		sr.ticker = time.NewTicker(sr.currentInterval)
 
 		for {

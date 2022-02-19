@@ -32,12 +32,12 @@ func (sr *StatusReporter) updateAddonInstanceStatus(ctx context.Context, conditi
 		condition.LastTransitionTime = currentTime
 	}
 	// TODO: confirm that it's not worth tracking the ObservedGeneration at per-condition basis
-	meta.SetStatusCondition(&(*addonInstance).Status.Conditions, condition)
-	addonInstance.Status.ObservedGeneration = (*addonInstance).Generation
+	meta.SetStatusCondition(&addonInstance.Status.Conditions, condition)
+	addonInstance.Status.ObservedGeneration = addonInstance.Generation
 	addonInstance.Status.LastHeartbeatTime = metav1.Now()
 
 	if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
-		return fmt.Errorf("failed to set AddonInstance's Condition: %w", err)
+		return fmt.Errorf("failed to update AddonInstance Status: %w", err)
 	}
 	return nil
 }

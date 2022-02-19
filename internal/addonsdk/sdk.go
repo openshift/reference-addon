@@ -107,9 +107,9 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 			case update := <-sr.updateCh:
 				// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
 				// synchronize the timer with this new interval
-				if update.addonInstanceSpec != nil {
-					if update.addonInstanceSpec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
-						sr.currentInterval = update.addonInstanceSpec.HeartbeatUpdatePeriod.Duration
+				if update.addonInstance != nil {
+					if update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
+						sr.currentInterval = update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration
 						sr.ticker.Reset(sr.currentInterval)
 					}
 				}
@@ -155,7 +155,7 @@ func (sr *StatusReporter) SendHeartbeat(ctx context.Context, condition metav1.Co
 
 func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
 	select {
-	case sr.updateCh <- updateOptions{addonInstanceSpec: &newAddonInstance.Spec}:
+	case sr.updateCh <- updateOptions{addonInstance: &newAddonInstance}:
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")

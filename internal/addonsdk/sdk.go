@@ -28,7 +28,7 @@ type StatusReporter struct {
 	addonTargetNamespace    string
 
 	// the latest condition which the heartbeat reporter would be reporting the periodically
-	latestCondition metav1.Condition
+	latestConditions []metav1.Condition
 
 	// to control the rate at which the heartbeat reporter would run
 	currentInterval time.Duration
@@ -63,11 +63,13 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 				addonInstanceInteractor: addonInstanceInteractor,
 				addonName:               addonName,
 				addonTargetNamespace:    addonTargetNamespace,
-				latestCondition: metav1.Condition{
-					Type:    "addons.managed.openshift.io/Healthy",
-					Status:  "False",
-					Reason:  "NoHeartbeatReported",
-					Message: fmt.Sprintf("Addon '%s' hasn't reported any heartbeat yet", addonName),
+				latestConditions: []metav1.Condition{
+					{
+						Type:    "addons.managed.openshift.io/Healthy",
+						Status:  "False",
+						Reason:  "NoHeartbeatReported",
+						Message: fmt.Sprintf("Addon '%s' hasn't reported any heartbeat yet", addonName),
+					},
 				},
 				stopperCh: make(chan bool),
 				updateCh:  make(chan updateOptions),
@@ -92,8 +94,8 @@ func GetStatusReporterSingleton() (*StatusReporter, error) {
 	return statusReporterSingleton, nil
 }
 
-func (sr StatusReporter) LatestCondition() metav1.Condition {
-	return sr.latestCondition
+func (sr StatusReporter) LatestConditions() []metav1.Condition {
+	return sr.latestConditions
 }
 
 func (sr *StatusReporter) Start(ctx context.Context) {
@@ -114,16 +116,16 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 					}
 				}
 
-				if update.condition != nil {
+				if update.conditions != nil {
 					// immediately register a new heartbeat upon receive one from the client/tenant side
-					if err := sr.updateAddonInstanceStatus(ctx, *update.condition); err != nil {
+					if err := sr.updateAddonInstanceStatus(ctx, *update.conditions); err != nil {
 						sr.log.Error(err, "failed to update the addoninstance status")
 						continue
 					}
-					sr.latestCondition = *update.condition
+					sr.latestConditions = *update.conditions
 				}
 			case <-sr.ticker.C:
-				if err := sr.updateAddonInstanceStatus(ctx, sr.latestCondition); err != nil {
+				if err := sr.updateAddonInstanceStatus(ctx, sr.latestConditions); err != nil {
 					sr.log.Error(err, "failed to report the regular heartbeat")
 				}
 			case <-ctx.Done():
@@ -144,9 +146,9 @@ func (sr *StatusReporter) Stop(ctx context.Context) error {
 	}
 }
 
-func (sr *StatusReporter) SendHeartbeat(ctx context.Context, condition metav1.Condition) error {
+func (sr *StatusReporter) SendHeartbeat(ctx context.Context, conditions []metav1.Condition) error {
 	select {
-	case sr.updateCh <- updateOptions{condition: &condition}: // near-instantly received by the heartbeat reporter loop
+	case sr.updateCh <- updateOptions{conditions: &conditions}: // near-instantly received by the heartbeat reporter loop
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")
@@ -158,6 +160,6 @@ func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, new
 	case sr.updateCh <- updateOptions{addonInstance: &newAddonInstance}:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("found the provided context to be exhausted")
+		return ctx.Err()
 	}
 }

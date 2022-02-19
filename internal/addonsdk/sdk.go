@@ -107,20 +107,20 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 			case update := <-sr.updateCh:
 				// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
 				// synchronize the timer with this new interval
-				if update.newAddonInstanceSpec != nil {
-					if update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
-						sr.currentInterval = update.newAddonInstanceSpec.HeartbeatUpdatePeriod.Duration
+				if update.addonInstanceSpec != nil {
+					if update.addonInstanceSpec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
+						sr.currentInterval = update.addonInstanceSpec.HeartbeatUpdatePeriod.Duration
 						sr.ticker.Reset(sr.currentInterval)
 					}
 				}
 
-				if update.newLatestCondition != nil {
+				if update.condition != nil {
 					// immediately register a new heartbeat upon receive one from the client/tenant side
-					if err := sr.updateAddonInstanceStatus(ctx, *update.newLatestCondition); err != nil {
+					if err := sr.updateAddonInstanceStatus(ctx, *update.condition); err != nil {
 						sr.log.Error(err, "failed to update the addoninstance status")
 						continue
 					}
-					sr.latestCondition = *update.newLatestCondition
+					sr.latestCondition = *update.condition
 				}
 			case <-sr.ticker.C:
 				if err := sr.updateAddonInstanceStatus(ctx, sr.latestCondition); err != nil {
@@ -146,7 +146,7 @@ func (sr *StatusReporter) Stop(ctx context.Context) error {
 
 func (sr *StatusReporter) SendHeartbeat(ctx context.Context, condition metav1.Condition) error {
 	select {
-	case sr.updateCh <- updateOptions{newLatestCondition: &condition}: // near-instantly received by the heartbeat reporter loop
+	case sr.updateCh <- updateOptions{condition: &condition}: // near-instantly received by the heartbeat reporter loop
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")
@@ -155,7 +155,7 @@ func (sr *StatusReporter) SendHeartbeat(ctx context.Context, condition metav1.Co
 
 func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec) error {
 	select {
-	case sr.updateCh <- updateOptions{newAddonInstanceSpec: newAddonInstanceSpec}:
+	case sr.updateCh <- updateOptions{addonInstanceSpec: newAddonInstanceSpec}:
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")

@@ -15,11 +15,11 @@ type updateOptions struct {
 	// using this instead of `newInterval *time.Duration` so that:
 	// - the client/tenant has to setup a watcher/informer for AddonInstance and just have to straight away input the entire AddonInstance object whenever an update on it is observed
 	// - in the future, if we (SDK developers) expect other inputs associated with other fields of AddonInstance Spec, we won't have to nudge the clients/tenants to update their watcher/informer to start a new bunch of arguments when calling `addonsdk.ReportUpdate(...)`.
-	//      They can still continue to blindly input the newAddonInstanceSpec whenever a change is observed by their informer/watcher and it would be upto our SDK to take decisions on the basis of whether `heartbeatUpdatePeriod` field changed or some other field changed.
-	newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec
+	//      They can still continue to blindly input the `addonInstanceSpec` whenever a change is observed by their informer/watcher and it would be upto our SDK to take decisions on the basis of whether `heartbeatUpdatePeriod` field changed or some other field changed.
+	addonInstanceSpec *addonsv1alpha1.AddonInstanceSpec
 
 	// for capturing new heartbeats/conditions to be reported
-	newLatestCondition *metav1.Condition
+	condition *metav1.Condition
 }
 
 func (sr *StatusReporter) updateAddonInstanceStatus(ctx context.Context, condition metav1.Condition) error {

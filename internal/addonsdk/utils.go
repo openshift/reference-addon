@@ -27,11 +27,9 @@ func (sr *StatusReporter) updateAddonInstanceStatus(ctx context.Context, conditi
 	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
 		return fmt.Errorf("failed to get the AddonInstance: %w", err)
 	}
-	currentTime := metav1.Now()
-	if condition.LastTransitionTime.IsZero() {
-		condition.LastTransitionTime = currentTime
-	}
-	// TODO: confirm that it's not worth tracking the ObservedGeneration at per-condition basis
+
+	// TODO(doc): we should point clients to use the helper methods from apimachinery, when interacting with object conditions:
+	// Ref: https://github.com/kubernetes/apimachinery/blob/57f2a0733447cfd41294477d833cce6580faaca3/pkg/api/meta/conditions.go#L30
 	meta.SetStatusCondition(&addonInstance.Status.Conditions, condition)
 	addonInstance.Status.ObservedGeneration = addonInstance.Generation
 	addonInstance.Status.LastHeartbeatTime = metav1.Now()

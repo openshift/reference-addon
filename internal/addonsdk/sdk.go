@@ -153,9 +153,9 @@ func (sr *StatusReporter) SendHeartbeat(ctx context.Context, condition metav1.Co
 	}
 }
 
-func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstanceSpec *addonsv1alpha1.AddonInstanceSpec) error {
+func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
 	select {
-	case sr.updateCh <- updateOptions{addonInstanceSpec: newAddonInstanceSpec}:
+	case sr.updateCh <- updateOptions{addonInstanceSpec: &newAddonInstance.Spec}:
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("found the provided context to be exhausted")

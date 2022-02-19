@@ -135,12 +135,12 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 	})
 }
 
-func (sr *StatusReporter) Stop() error {
+func (sr *StatusReporter) Stop(ctx context.Context) error {
 	select {
 	case sr.stopperCh <- true:
 		return nil
-	case <-time.After(30 * time.Second):
-		return fmt.Errorf("failed to stop the reporter: timed out waiting for the reporter to ack the stop signal")
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 

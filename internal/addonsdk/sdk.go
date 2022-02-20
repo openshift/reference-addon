@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/zapr"
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -98,8 +99,9 @@ func (sr StatusReporter) LatestConditions() []metav1.Condition {
 	return sr.latestConditions
 }
 
-func (sr *StatusReporter) Start(ctx context.Context) {
+func (sr *StatusReporter) Start(ctx context.Context) error {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
+	var startErr error
 	sr.executeOnce.Do(func() {
 		defer sr.ticker.Stop()
 		sr.ticker = time.NewTicker(sr.interval)
@@ -124,12 +126,11 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 					sr.log.Error(err, "failed to report the regular heartbeat")
 				}
 			case <-ctx.Done():
-				return
 			case <-sr.stopperCh:
-				return
 			}
 		}
 	})
+	return startErr
 }
 
 func (sr *StatusReporter) Stop(ctx context.Context) error {
@@ -141,7 +142,7 @@ func (sr *StatusReporter) Stop(ctx context.Context) error {
 	}
 }
 
-func (sr *StatusReporter) SendHeartbeat(ctx context.Context, conditions []metav1.Condition) error {
+func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
 	// immediately register a new heartbeat upon receive one from the client/tenant side
 	addonInstance := &addonsv1alpha1.AddonInstance{}
 	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
@@ -151,7 +152,11 @@ func (sr *StatusReporter) SendHeartbeat(ctx context.Context, conditions []metav1
 	// making a deep-copy for current Conditions for rolling back in case of failures
 	previousConditions := addonInstance.Status.Conditions
 
-	addonInstance.Status.Conditions = conditions
+	newConditions := addonInstance.Status.Conditions
+	for _, condition := range conditions {
+		meta.SetStatusCondition(&newConditions, condition)
+	}
+	addonInstance.Status.Conditions = newConditions
 	addonInstance.Status.ObservedGeneration = addonInstance.Generation
 	addonInstance.Status.LastHeartbeatTime = metav1.Now()
 

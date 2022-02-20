@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -25,7 +26,11 @@ func (sr *StatusReporter) updateAddonInstanceStatus(ctx context.Context, conditi
 
 	// TODO(doc): we should point clients to use the helper methods from apimachinery, when interacting with object conditions:
 	// Ref: https://github.com/kubernetes/apimachinery/blob/57f2a0733447cfd41294477d833cce6580faaca3/pkg/api/meta/conditions.go#L30
-	addonInstance.Status.Conditions = conditions
+	newConditions := addonInstance.Status.Conditions
+	for _, condition := range conditions {
+		meta.SetStatusCondition(&newConditions, condition)
+	}
+	addonInstance.Status.Conditions = newConditions
 	addonInstance.Status.ObservedGeneration = addonInstance.Generation
 	addonInstance.Status.LastHeartbeatTime = metav1.Now()
 

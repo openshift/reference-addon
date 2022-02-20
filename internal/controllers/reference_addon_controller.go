@@ -10,10 +10,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
+	"github.com/openshift/reference-addon/internal/addonsdk"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ReferenceAddonReconciler struct {
 	client.Client
+	*addonsdk.StatusReporter
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
@@ -22,13 +25,29 @@ func (r *ReferenceAddonReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("addon", req.NamespacedName.String())
 
+	successfulCondition := metav1.Condition{
+		Type:    "addons.managed.openshift.io/Healthy",
+		Status:  "True",
+		Reason:  "AllComponentsUp",
+		Message: "Everything under reference-addon is working perfectly fine",
+	}
+	failureCondition := metav1.Condition{
+		Type:    "addons.managed.openshift.io/Healthy",
+		Status:  "False",
+		Reason:  "ImproperNaming",
+		Message: "The addon resources are improperly named",
+	}
+
 	// dummy code to indicate reconciliation of the reference-addon object
 	if strings.HasPrefix(req.NamespacedName.Name, "redhat-") {
 		log.Info("reconciling for a reference addon object prefixed by redhat- ")
+		_ = r.SetConditions(ctx, []metav1.Condition{successfulCondition})
 	} else if strings.HasPrefix(req.NamespacedName.Name, "reference-addon") {
 		log.Info("reconciling for a reference addon object named reference-addon")
+		_ = r.SetConditions(ctx, []metav1.Condition{successfulCondition})
 	} else {
 		log.Info("reconciling for a reference addon object not prefixed by redhat- or named reference-addon")
+		_ = r.SetConditions(ctx, []metav1.Condition{failureCondition})
 	}
 
 	return ctrl.Result{}, nil

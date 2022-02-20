@@ -173,7 +173,7 @@ dependencies: \
 # Run against the configured Kubernetes cluster in ~/.kube/config or $KUBECONFIG
 run: generate
 	go run -ldflags "-w $(LD_FLAGS)" \
-		./cmd/reference-addon-manager/main.go \
+		./cmd/reference-addon-manager/*.go \
 			-pprof-addr="127.0.0.1:8065"
 .PHONY: run
 

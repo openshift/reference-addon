@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	refapis "github.com/openshift/reference-addon/apis"
+	"github.com/openshift/reference-addon/internal/addonsdk"
 	"github.com/openshift/reference-addon/internal/controllers"
 )
 
@@ -92,11 +93,30 @@ func main() {
 		}
 	}
 
+	// fetching the following from the Downwards Api in case of reference-addon.
+	// Can be hardcoded or supplied in any other way too depending on the addon developers.
+	addonName := os.Getenv("ADDON_NAME")
+	addonNamespace := os.Getenv("ADDON_NAMESPACE")
+
+	// Setup the StatusReporter
+	addonSdkClient := NewAddonSDKClient(mgr.GetClient())
+	statusReporter, err := addonsdk.InitializeStatusReporterSingleton(addonSdkClient, addonName, addonNamespace)
+	if err != nil {
+		setupLog.Error(err, "unable to setup StatusReporter")
+		os.Exit(1)
+	}
+
+	if err := mgr.Add(statusReporter); err != nil {
+		setupLog.Error(err, "unable to start status-reporter")
+		os.Exit(1)
+	}
+
 	// the following section hooks up a heartbeat reporter with the current addon/operator
 	r := controllers.ReferenceAddonReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
+		Scheme:         mgr.GetScheme(),
+		StatusReporter: statusReporter,
 	}
 
 	if err = r.SetupWithManager(mgr); err != nil {

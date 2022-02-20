@@ -40,6 +40,9 @@ type StatusReporter struct {
 	// for concurrency-safely executing one instance of heartbeat reporter loop
 	executeOnce sync.Once
 
+	//for tracking if the heartbeat reporter is running or done running
+	doneCh chan bool
+
 	log logr.Logger
 }
 
@@ -66,8 +69,11 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 				},
 				stopperCh: make(chan bool),
 				updateCh:  make(chan updateOptions),
+				doneCh:    make(chan bool),
 				log:       logger,
 			}
+			// because the heartbeat reporter still hasn't been started
+			defer close(statusReporterSingleton.doneCh)
 		}
 	}
 
@@ -89,6 +95,9 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	var startErr error
 	sr.executeOnce.Do(func() {
+		sr.doneCh = make(chan bool)
+		defer close(sr.doneCh)
+
 		currentAddonInstance := &addonsv1alpha1.AddonInstance{}
 		if err := sr.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
 			startErr = fmt.Errorf("error occurred while fetching the current heartbeat update period interval: %w", err)
@@ -127,10 +136,13 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 
 func (sr *StatusReporter) Stop(ctx context.Context) error {
 	select {
+	case <-sr.doneCh: // will non-blockingly receive whenever doneCh would be closed
+		sr.log.Info("status reporter is already stopped")
+		return nil
 	case sr.stopperCh <- true:
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("failed to stop the status reporter: %w", ctx.Err())
 	}
 }
 
@@ -168,6 +180,9 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 	}
 
 	select {
+	case <-sr.doneCh:
+		sr.log.Info("StatusReporter found to be stopped")
+		return nil
 	case sr.updateCh <- updateOptions{conditions: &conditions}: // near-instantly received by the StatusReporter loop
 		return nil
 	case <-ctx.Done():
@@ -184,9 +199,11 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 
 func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
 	select {
+	case <-sr.doneCh:
+		return fmt.Errorf("can't report AddonInstance spec change on a stopped StatusReporter")
 	case sr.updateCh <- updateOptions{addonInstance: &newAddonInstance}:
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("failed to report AddonInstance spec change: %w", ctx.Err())
 	}
 }

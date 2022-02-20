@@ -27,7 +27,7 @@ type StatusReporter struct {
 	addonName               string
 	addonTargetNamespace    string
 
-	// the latest condition which the heartbeat reporter would be reporting the periodically
+	// the latest conditions which the heartbeat reporter would be reporting periodically
 	latestConditions []metav1.Condition
 
 	// to control the rate at which the heartbeat reporter would run
@@ -117,11 +117,6 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 				}
 
 				if update.conditions != nil {
-					// immediately register a new heartbeat upon receive one from the client/tenant side
-					if err := sr.updateAddonInstanceStatus(ctx, *update.conditions); err != nil {
-						sr.log.Error(err, "failed to update the addoninstance status")
-						continue
-					}
 					sr.latestConditions = *update.conditions
 				}
 			case <-sr.ticker.C:
@@ -147,11 +142,46 @@ func (sr *StatusReporter) Stop(ctx context.Context) error {
 }
 
 func (sr *StatusReporter) SendHeartbeat(ctx context.Context, conditions []metav1.Condition) error {
+	// immediately register a new heartbeat upon receive one from the client/tenant side
+	addonInstance := &addonsv1alpha1.AddonInstance{}
+	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
+		return fmt.Errorf("failed to get the AddonInstance: %w", err)
+	}
+
+	// making a deep-copy for current Conditions for rolling back in case of failures
+	previousConditions := addonInstance.Status.Conditions
+
+	addonInstance.Status.Conditions = conditions
+	addonInstance.Status.ObservedGeneration = addonInstance.Generation
+	addonInstance.Status.LastHeartbeatTime = metav1.Now()
+
+	if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
+		return fmt.Errorf("failed to update AddonInstance Status: %w", err)
+	}
+
+	// rollbackAddonInstanceStatusUpdate() will be called when the `conditions` would fail to be sent on the `sr.updateCh` channel
+	rollbackAddonInstanceStatusUpdate := func() error {
+		addonInstance.Status.Conditions = previousConditions
+		addonInstance.Status.LastHeartbeatTime = metav1.Now()
+
+		if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
+			return fmt.Errorf("failed to update AddonInstance Status: %w", err)
+		}
+		return nil
+	}
+
 	select {
-	case sr.updateCh <- updateOptions{conditions: &conditions}: // near-instantly received by the heartbeat reporter loop
+	case sr.updateCh <- updateOptions{conditions: &conditions}: // near-instantly received by the StatusReporter loop
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("found the provided context to be exhausted")
+		sr.log.Error(ctx.Err(), "failed to send the heartbeat's Conditions to the StatusReporter")
+		sr.log.Info("rolling back the AddonInstance Status update...")
+		// not 100% full-proof rollback because in theory, the rollback could still fail.
+		// Yet in that case too, eventual consistency would still be preserved because our AddonInstance.Status.Conditions would get re-synchronized to `sr.latestConditions` in the next iteration of the StatusReporter loop.
+		if err := rollbackAddonInstanceStatusUpdate(); err != nil {
+			return fmt.Errorf("failed to rollback the AddonInstance Status update: %w", err)
+		}
+		return nil
 	}
 }
 

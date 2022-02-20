@@ -31,8 +31,8 @@ type StatusReporter struct {
 	latestConditions []metav1.Condition
 
 	// to control the rate at which the heartbeat reporter would run
-	currentInterval time.Duration
-	ticker          *time.Ticker
+	interval time.Duration
+	ticker   *time.Ticker
 
 	// for effectively communicating the stop and update signals
 	stopperCh chan bool
@@ -80,7 +80,7 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 			if err := statusReporterSingleton.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: statusReporterSingleton.addonTargetNamespace}, currentAddonInstance); err != nil {
 				return nil, fmt.Errorf("error occurred while fetching the current heartbeat update period interval")
 			}
-			statusReporterSingleton.currentInterval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
+			statusReporterSingleton.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
 		}
 	}
 
@@ -102,7 +102,7 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	sr.executeOnce.Do(func() {
 		defer sr.ticker.Stop()
-		sr.ticker = time.NewTicker(sr.currentInterval)
+		sr.ticker = time.NewTicker(sr.interval)
 
 		for {
 			select {
@@ -110,9 +110,9 @@ func (sr *StatusReporter) Start(ctx context.Context) {
 				// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
 				// synchronize the timer with this new interval
 				if update.addonInstance != nil {
-					if update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration != sr.currentInterval {
-						sr.currentInterval = update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration
-						sr.ticker.Reset(sr.currentInterval)
+					if update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration != sr.interval {
+						sr.interval = update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration
+						sr.ticker.Reset(sr.interval)
 					}
 				}
 

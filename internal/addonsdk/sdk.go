@@ -87,10 +87,12 @@ func GetStatusReporterSingleton() (*StatusReporter, error) {
 	return statusReporterSingleton, nil
 }
 
+//nolint
 func (sr StatusReporter) GetAddonTargetNamespace() string {
 	return sr.addonTargetNamespace
 }
 
+//nolint
 func (sr StatusReporter) LatestConditions() []metav1.Condition {
 	return sr.latestConditions
 }

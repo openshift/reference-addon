@@ -49,7 +49,7 @@ type StatusReporter struct {
 var _ statusReporterClient = (*StatusReporter)(nil)
 
 // InitializeStatusReporterSingleton sets up a singleton of the type `StatusReporter` (only if it doesn't exist yet) and returns it to the caller.
-func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName string, addonTargetNamespace string) (*StatusReporter, error) {
+func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName string, addonTargetNamespace string) *StatusReporter {
 
 	zapLog, err := zap.NewProduction()
 	if err != nil {
@@ -76,16 +76,10 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 				updateCh:  make(chan updateOptions),
 				log:       zapr.NewLogger(zapLog),
 			}
-
-			currentAddonInstance := &addonsv1alpha1.AddonInstance{}
-			if err := statusReporterSingleton.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: statusReporterSingleton.addonTargetNamespace}, currentAddonInstance); err != nil {
-				return nil, fmt.Errorf("error occurred while fetching the current heartbeat update period interval")
-			}
-			statusReporterSingleton.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
 		}
 	}
 
-	return statusReporterSingleton, nil
+	return statusReporterSingleton
 }
 
 func GetStatusReporterSingleton() (*StatusReporter, error) {
@@ -103,6 +97,12 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	var startErr error
 	sr.executeOnce.Do(func() {
+		currentAddonInstance := &addonsv1alpha1.AddonInstance{}
+		if err := sr.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
+			startErr = fmt.Errorf("error occurred while fetching the current heartbeat update period interval: %w", err)
+			return
+		}
+		sr.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
 		defer sr.ticker.Stop()
 		sr.ticker = time.NewTicker(sr.interval)
 

@@ -100,9 +100,9 @@ func main() {
 
 	// Setup the StatusReporter
 	addonSdkClient := NewAddonSDKClient(mgr.GetClient())
-	statusReporter, err := addonsdk.InitializeStatusReporterSingleton(addonSdkClient, addonName, addonNamespace)
+	statusReporter := addonsdk.InitializeStatusReporterSingleton(addonSdkClient, addonName, addonNamespace, ctrl.Log.WithName("StatusReporter"))
 	if err != nil {
-		setupLog.Error(err, "unable to setup StatusReporter")
+		setupLog.Error(err, "unable to setup status-reporter")
 		os.Exit(1)
 	}
 

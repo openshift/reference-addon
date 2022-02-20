@@ -111,11 +111,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// setup addonInstance spec change watcher
+	addonInstanceWatcher := controllers.AddonInstanceWatcher{
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("AddonInstance"),
+		StatusReporter: statusReporter,
+	}
+	if err = addonInstanceWatcher.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AddonInstance")
+		os.Exit(1)
+	}
+
 	// the following section hooks up a heartbeat reporter with the current addon/operator
 	r := controllers.ReferenceAddonReconciler{
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
-		Scheme:         mgr.GetScheme(),
 		StatusReporter: statusReporter,
 	}
 

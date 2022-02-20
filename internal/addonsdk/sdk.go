@@ -87,6 +87,10 @@ func GetStatusReporterSingleton() (*StatusReporter, error) {
 	return statusReporterSingleton, nil
 }
 
+func (sr StatusReporter) GetAddonTargetNamespace() string {
+	return sr.addonTargetNamespace
+}
+
 func (sr StatusReporter) LatestConditions() []metav1.Condition {
 	return sr.latestConditions
 }

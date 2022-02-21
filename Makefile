@@ -215,7 +215,7 @@ FORCE_FLAGS = -count=1
 test-e2e: config/deploy/deployment.yaml
 	@echo "running e2e tests..."
 
-	@go test -v $(FORCE_FLAGS) ./e2e/...
+	@go test -v $(FORCE_FLAGS) ./integration/...
 .PHONY: test-e2e
 
 # Sets up a local kind cluster and runs E2E tests against this local cluster.
@@ -298,7 +298,12 @@ config/addon/reference-addon.yaml: FORCE $(YQ)
 ### TODO(ykukreja): Add target for recognising and modifying the registry host instead of using quay.io
 setup-reference-addon: | \
 	push-image-reference-addon-index \
-    config/addon/reference-addon.yaml
+    config/addon/reference-addon.yaml \
+
+setup-addon-operator-crds:
+	@kubectl apply -f https://raw.githubusercontent.com/openshift/addon-operator/main/config/deploy/addons.managed.openshift.io_addoninstances.yaml;
+	@kubectl apply -f https://raw.githubusercontent.com/openshift/addon-operator/main/config/deploy/addons.managed.openshift.io_addonoperators.yaml;
+	@kubectl apply -f https://raw.githubusercontent.com/openshift/addon-operator/main/config/deploy/addons.managed.openshift.io_addons.yaml;
 
 # make sure that we install our components into the kind cluster and disregard normal $KUBECONFIG
 dev-setup: export KUBECONFIG=$(abspath $(KIND_KUBECONFIG))
@@ -306,14 +311,22 @@ dev-setup: export KUBECONFIG=$(abspath $(KIND_KUBECONFIG))
 dev-setup: | \
 	create-kind-cluster \
 	apply-olm \
-	spply-openshift-console
+	apply-openshift-console \
+	setup-addon-operator-crds
 .PHONY: dev-setup
 
 ## Setup a local env for integration test development. (Kind, OLM, OKD Console, Addon Operator).
 test-setup: | \
 	dev-setup \
+	setup-addon-operator-crds \
 	setup-reference-addon
 .PHONY: test-setup
+
+## Setup a local env for integration test development. (Kind, OLM, OKD Console, Addon Operator).
+test-setup-local: | \
+	dev-setup \
+	setup-addon-operator-crds
+.PHONY: test-setup-local
 
 # Installs OLM (Operator Lifecycle Manager) into the currently selected cluster.
 apply-olm:

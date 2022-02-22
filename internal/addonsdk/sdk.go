@@ -46,9 +46,6 @@ type StatusReporter struct {
 	log logr.Logger
 }
 
-// ensure that the `StatusReporter` implements the `addonsdk.statusReporterClient` interface
-var _ statusReporterClient = (*StatusReporter)(nil)
-
 // InitializeStatusReporterSingleton sets up a singleton of the type `StatusReporter` (only if it doesn't exist yet) and returns it to the caller.
 func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName string, addonTargetNamespace string, logger logr.Logger) *StatusReporter {
 	if statusReporterSingleton == nil {

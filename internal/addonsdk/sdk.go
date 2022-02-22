@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	statusReporterSingleton *StatusReporter
+	statusReporterSingleton *statusReporter
 	initializeSingletonOnce sync.Once
 )
 
 // a nice heartbeat-reporter implemented by the MT-SRE which our tenants can use
 // if they don't like it, they can implement their own heartbeat reporter by creating a type which implements the `addonsdk.statusReporterClient` interface
-type StatusReporter struct {
+type statusReporter struct {
 	// object provided by the client/tenants which implements the addonsdk.client interface
 	addonInstanceInteractor client
 	addonName               string
@@ -43,10 +43,10 @@ type StatusReporter struct {
 	log logr.Logger
 }
 
-// SetupStatusReporter sets up a singleton of the type `StatusReporter` (only if it doesn't exist yet) and returns it to the caller.
-func SetupStatusReporter(addonInstanceInteractor client, addonName string, addonTargetNamespace string, logger logr.Logger) *StatusReporter {
+// SetupStatusReporter sets up a singleton of the type `statusReporter` (only if it doesn't exist yet) and returns it to the caller.
+func SetupStatusReporter(addonInstanceInteractor client, addonName string, addonTargetNamespace string, logger logr.Logger) StatusReporterClient {
 	initializeSingletonOnce.Do(func() {
-		statusReporterSingleton = &StatusReporter{
+		statusReporterSingleton = &statusReporter{
 			addonInstanceInteractor: addonInstanceInteractor,
 			addonName:               addonName,
 			addonTargetNamespace:    addonTargetNamespace,
@@ -69,11 +69,7 @@ func SetupStatusReporter(addonInstanceInteractor client, addonName string, addon
 	return statusReporterSingleton
 }
 
-func (sr *StatusReporter) GetAddonTargetNamespace() string {
-	return sr.addonTargetNamespace
-}
-
-func (sr *StatusReporter) Start(ctx context.Context) error {
+func (sr *statusReporter) Start(ctx context.Context) error {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	select {
 	case <-sr.doneCh:
@@ -121,7 +117,7 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 	}
 }
 
-func (sr *StatusReporter) Stop(ctx context.Context) error {
+func (sr *statusReporter) Stop(ctx context.Context) error {
 	select {
 	case <-sr.doneCh: // will non-blockingly receive whenever doneCh would be closed
 		sr.log.Info("status reporter is already stopped")
@@ -133,7 +129,7 @@ func (sr *StatusReporter) Stop(ctx context.Context) error {
 	}
 }
 
-func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
+func (sr *statusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
 	// immediately register a new heartbeat upon receive one from the client/tenant side
 	addonInstance := &addonsv1alpha1.AddonInstance{}
 	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
@@ -184,7 +180,7 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 	}
 }
 
-func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
+func (sr *statusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
 	select {
 	case <-sr.doneCh:
 		return fmt.Errorf("can't report AddonInstance spec change on a stopped StatusReporter")

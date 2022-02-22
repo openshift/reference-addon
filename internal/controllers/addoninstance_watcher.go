@@ -19,8 +19,9 @@ import (
 
 type AddonInstanceWatcher struct {
 	client.Client
-	*addonsdk.StatusReporter
-	Log logr.Logger
+	StatusReporter  addonsdk.StatusReporterClient
+	Log             logr.Logger
+	TargetNamespace string
 }
 
 func (r *AddonInstanceWatcher) Reconcile(
@@ -49,7 +50,7 @@ func (r *AddonInstanceWatcher) SetupWithManager(mgr ctrl.Manager) error {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// AddonInstance CR to be watched should be only <target-namespace>/addon-instance
 			// ignore updates to .status in which case metadata.generation does not change
-			return e.ObjectNew.GetName() == "addon-instance" && e.ObjectNew.GetNamespace() == r.StatusReporter.GetAddonTargetNamespace() && e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+			return e.ObjectNew.GetName() == "addon-instance" && e.ObjectNew.GetNamespace() == r.TargetNamespace && e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false

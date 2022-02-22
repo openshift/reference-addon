@@ -18,7 +18,7 @@ type updateOptions struct {
 	conditions *[]metav1.Condition
 }
 
-func (sr *StatusReporter) updateAddonInstanceStatus(ctx context.Context, conditions []metav1.Condition) error {
+func (sr *statusReporter) updateAddonInstanceStatus(ctx context.Context, conditions []metav1.Condition) error {
 	addonInstance := &addonsv1alpha1.AddonInstance{}
 	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
 		return fmt.Errorf("failed to get the AddonInstance: %w", err)

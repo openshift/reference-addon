@@ -113,9 +113,10 @@ func main() {
 
 	// setup addonInstance spec change watcher
 	addonInstanceWatcher := controllers.AddonInstanceWatcher{
-		Client:         mgr.GetClient(),
-		Log:            ctrl.Log.WithName("controllers").WithName("AddonInstance"),
-		StatusReporter: statusReporter,
+		Client:          mgr.GetClient(),
+		Log:             ctrl.Log.WithName("controllers").WithName("AddonInstance"),
+		StatusReporter:  statusReporter,
+		TargetNamespace: addonNamespace,
 	}
 	if err = addonInstanceWatcher.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AddonInstance")

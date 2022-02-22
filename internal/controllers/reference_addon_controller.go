@@ -16,9 +16,9 @@ import (
 
 type ReferenceAddonReconciler struct {
 	client.Client
-	*addonsdk.StatusReporter
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	StatusReporter addonsdk.StatusReporterClient
+	Log            logr.Logger
+	Scheme         *runtime.Scheme
 }
 
 func (r *ReferenceAddonReconciler) Reconcile(
@@ -38,16 +38,21 @@ func (r *ReferenceAddonReconciler) Reconcile(
 		Message: "The addon resources are improperly named",
 	}
 
+	var conditionsToReport []metav1.Condition
 	// dummy code to indicate reconciliation of the reference-addon object
 	if strings.HasPrefix(req.NamespacedName.Name, "redhat-") {
 		log.Info("reconciling for a reference addon object prefixed by redhat- ")
-		_ = r.SetConditions(ctx, []metav1.Condition{successfulCondition})
+		conditionsToReport = []metav1.Condition{successfulCondition}
 	} else if strings.HasPrefix(req.NamespacedName.Name, "reference-addon") {
 		log.Info("reconciling for a reference addon object named reference-addon")
-		_ = r.SetConditions(ctx, []metav1.Condition{successfulCondition})
+		conditionsToReport = []metav1.Condition{successfulCondition}
 	} else {
 		log.Info("reconciling for a reference addon object not prefixed by redhat- or named reference-addon")
-		_ = r.SetConditions(ctx, []metav1.Condition{failureCondition})
+		conditionsToReport = []metav1.Condition{failureCondition}
+	}
+
+	if err := r.StatusReporter.SetConditions(ctx, conditionsToReport); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

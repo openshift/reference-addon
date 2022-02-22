@@ -58,10 +58,10 @@ func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName
 				addonTargetNamespace:    addonTargetNamespace,
 				latestConditions: []metav1.Condition{
 					{
-						Type:    "addons.managed.openshift.io/Healthy",
-						Status:  "False",
-						Reason:  "NoHeartbeatReported",
-						Message: fmt.Sprintf("Addon '%s' hasn't reported any heartbeat yet", addonName),
+						Type:    AddonHealthyConditionType,
+						Status:  metav1.ConditionUnknown,
+						Reason:  "NoHealthReported",
+						Message: fmt.Sprintf("Addon %q hasn't reported health yet", addonName),
 					},
 				},
 				stopperCh: make(chan bool),
@@ -84,14 +84,8 @@ func GetStatusReporterSingleton() (*StatusReporter, error) {
 	return statusReporterSingleton, nil
 }
 
-//nolint
-func (sr StatusReporter) GetAddonTargetNamespace() string {
+func (sr *StatusReporter) GetAddonTargetNamespace() string {
 	return sr.addonTargetNamespace
-}
-
-//nolint
-func (sr StatusReporter) LatestConditions() []metav1.Condition {
-	return sr.latestConditions
 }
 
 func (sr *StatusReporter) Start(ctx context.Context) error {

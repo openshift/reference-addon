@@ -23,17 +23,17 @@ type ReferenceAddonReconciler struct {
 
 func (r *ReferenceAddonReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("addon", req.NamespacedName.String())
+	log := r.Log.WithValues("referenceaddon", req.NamespacedName.String())
 
 	successfulCondition := metav1.Condition{
-		Type:    "addons.managed.openshift.io/Healthy",
-		Status:  "True",
+		Type:    addonsdk.AddonHealthyConditionType,
+		Status:  metav1.ConditionTrue,
 		Reason:  "AllComponentsUp",
 		Message: "Everything under reference-addon is working perfectly fine",
 	}
 	failureCondition := metav1.Condition{
-		Type:    "addons.managed.openshift.io/Healthy",
-		Status:  "False",
+		Type:    addonsdk.AddonHealthyConditionType,
+		Status:  metav1.ConditionFalse,
 		Reason:  "ImproperNaming",
 		Message: "The addon resources are improperly named",
 	}

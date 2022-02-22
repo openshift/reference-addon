@@ -37,9 +37,6 @@ type StatusReporter struct {
 	stopperCh chan bool
 	updateCh  chan updateOptions
 
-	// for concurrency-safely executing one instance of heartbeat reporter loop
-	executeOnce sync.Once
-
 	//for tracking if the heartbeat reporter is running or done running
 	doneCh chan bool
 
@@ -78,45 +75,50 @@ func (sr *StatusReporter) GetAddonTargetNamespace() string {
 
 func (sr *StatusReporter) Start(ctx context.Context) error {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
-	var startErr error
-	sr.executeOnce.Do(func() {
-		sr.doneCh = make(chan bool)
-		defer close(sr.doneCh)
+	select {
+	case <-sr.doneCh:
+		sr.log.Info("StatusReporter already found to be running. Please explicitly Stop() it first before trying to restart it")
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	sr.doneCh = make(chan bool)
+	defer close(sr.doneCh)
 
-		currentAddonInstance := &addonsv1alpha1.AddonInstance{}
-		if err := sr.addonInstanceInteractor.GetAddonInstance(context.TODO(), types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
-			startErr = fmt.Errorf("error occurred while fetching the current heartbeat update period interval: %w", err)
-			return
-		}
-		sr.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
-		defer sr.ticker.Stop()
-		sr.ticker = time.NewTicker(sr.interval)
+	currentAddonInstance := &addonsv1alpha1.AddonInstance{}
+	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
+		return fmt.Errorf("error occurred while fetching the current heartbeat update period interval: %w", err)
+	}
+	sr.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
+	defer sr.ticker.Stop()
+	sr.ticker = time.NewTicker(sr.interval)
 
-		for {
-			select {
-			case update := <-sr.updateCh:
-				// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
-				// synchronize the timer with this new interval
-				if update.addonInstance != nil {
-					if update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration != sr.interval {
-						sr.interval = update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration
-						sr.ticker.Reset(sr.interval)
-					}
+	for {
+		select {
+		case update := <-sr.updateCh:
+			// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
+			// synchronize the timer with this new interval
+			if update.addonInstance != nil {
+				if update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration != sr.interval {
+					sr.interval = update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration
+					sr.ticker.Reset(sr.interval)
 				}
-
-				if update.conditions != nil {
-					sr.latestConditions = *update.conditions
-				}
-			case <-sr.ticker.C:
-				if err := sr.updateAddonInstanceStatus(ctx, sr.latestConditions); err != nil {
-					sr.log.Error(err, "failed to report the regular heartbeat")
-				}
-			case <-ctx.Done():
-			case <-sr.stopperCh:
 			}
+
+			if update.conditions != nil {
+				sr.latestConditions = *update.conditions
+			}
+		case <-sr.ticker.C:
+			if err := sr.updateAddonInstanceStatus(ctx, sr.latestConditions); err != nil {
+				sr.log.Error(err, "failed to report the regular heartbeat")
+			}
+		case <-ctx.Done():
+			return nil
+		case <-sr.stopperCh:
+			return nil
 		}
-	})
-	return startErr
+	}
 }
 
 func (sr *StatusReporter) Stop(ctx context.Context) error {
@@ -127,7 +129,7 @@ func (sr *StatusReporter) Stop(ctx context.Context) error {
 	case sr.stopperCh <- true:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("failed to stop the status reporter: %w", ctx.Err())
+		return ctx.Err()
 	}
 }
 
@@ -189,6 +191,6 @@ func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, new
 	case sr.updateCh <- updateOptions{addonInstance: &newAddonInstance}:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("failed to report AddonInstance spec change: %w", ctx.Err())
+		return ctx.Err()
 	}
 }

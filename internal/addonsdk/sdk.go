@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	statusReporterSingleton      *StatusReporter
-	statusReporterSingletonMutex = &sync.Mutex{}
+	statusReporterSingleton *StatusReporter
+	initializeSingletonOnce sync.Once
 )
 
 // a nice heartbeat-reporter implemented by the MT-SRE which our tenants can use
@@ -46,42 +46,30 @@ type StatusReporter struct {
 	log logr.Logger
 }
 
-// InitializeStatusReporterSingleton sets up a singleton of the type `StatusReporter` (only if it doesn't exist yet) and returns it to the caller.
-func InitializeStatusReporterSingleton(addonInstanceInteractor client, addonName string, addonTargetNamespace string, logger logr.Logger) *StatusReporter {
-	if statusReporterSingleton == nil {
-		statusReporterSingletonMutex.Lock()
-		defer statusReporterSingletonMutex.Unlock()
-		if statusReporterSingleton == nil {
-			statusReporterSingleton = &StatusReporter{
-				addonInstanceInteractor: addonInstanceInteractor,
-				addonName:               addonName,
-				addonTargetNamespace:    addonTargetNamespace,
-				latestConditions: []metav1.Condition{
-					{
-						Type:    AddonHealthyConditionType,
-						Status:  metav1.ConditionUnknown,
-						Reason:  "NoHealthReported",
-						Message: fmt.Sprintf("Addon %q hasn't reported health yet", addonName),
-					},
+// SetupStatusReporter sets up a singleton of the type `StatusReporter` (only if it doesn't exist yet) and returns it to the caller.
+func SetupStatusReporter(addonInstanceInteractor client, addonName string, addonTargetNamespace string, logger logr.Logger) *StatusReporter {
+	initializeSingletonOnce.Do(func() {
+		statusReporterSingleton = &StatusReporter{
+			addonInstanceInteractor: addonInstanceInteractor,
+			addonName:               addonName,
+			addonTargetNamespace:    addonTargetNamespace,
+			latestConditions: []metav1.Condition{
+				{
+					Type:    AddonHealthyConditionType,
+					Status:  metav1.ConditionUnknown,
+					Reason:  "NoHealthReported",
+					Message: fmt.Sprintf("Addon %q hasn't reported health yet", addonName),
 				},
-				stopperCh: make(chan bool),
-				updateCh:  make(chan updateOptions),
-				doneCh:    make(chan bool),
-				log:       logger,
-			}
-			// because the heartbeat reporter still hasn't been started
-			defer close(statusReporterSingleton.doneCh)
+			},
+			stopperCh: make(chan bool),
+			updateCh:  make(chan updateOptions),
+			doneCh:    make(chan bool),
+			log:       logger,
 		}
-	}
-
+		// because the heartbeat reporter still hasn't been started
+		defer close(statusReporterSingleton.doneCh)
+	})
 	return statusReporterSingleton
-}
-
-func GetStatusReporterSingleton() (*StatusReporter, error) {
-	if statusReporterSingleton == nil {
-		return nil, fmt.Errorf("heartbeat-reporter not found to be initialised. Initialize it by calling `InitializeStatusReporterSingleton(...)`")
-	}
-	return statusReporterSingleton, nil
 }
 
 func (sr *StatusReporter) GetAddonTargetNamespace() string {

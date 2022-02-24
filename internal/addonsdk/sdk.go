@@ -137,7 +137,8 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 	}
 
 	// making a deep-copy for current Conditions for rolling back in case of failures
-	previousConditions := addonInstance.Status.Conditions
+	previousConditions := make([]metav1.Condition, len(addonInstance.Status.Conditions))
+	copy(previousConditions, addonInstance.Status.Conditions)
 
 	newConditions := addonInstance.Status.Conditions
 	for _, condition := range conditions {
@@ -156,7 +157,8 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 		addonInstance.Status.Conditions = previousConditions
 		addonInstance.Status.LastHeartbeatTime = metav1.Now()
 
-		if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
+		// can't use `ctx` for this update because this rollback would be called `ctx` would be `Done()` meaning that feeding `ctx` to the following rollbacked update would fail it too
+		if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(context.TODO(), addonInstance); err != nil {
 			return fmt.Errorf("failed to update AddonInstance Status: %w", err)
 		}
 		return nil

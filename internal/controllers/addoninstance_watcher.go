@@ -19,7 +19,7 @@ import (
 
 type AddonInstanceWatcher struct {
 	client.Client
-	StatusReporter  addonsdk.StatusReporterClient
+	StatusReporter  *addonsdk.StatusReporter
 	Log             logr.Logger
 	TargetNamespace string
 }

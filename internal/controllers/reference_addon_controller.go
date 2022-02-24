@@ -16,7 +16,7 @@ import (
 
 type ReferenceAddonReconciler struct {
 	client.Client
-	StatusReporter addonsdk.StatusReporterClient
+	StatusReporter *addonsdk.StatusReporter
 	Log            logr.Logger
 	Scheme         *runtime.Scheme
 }

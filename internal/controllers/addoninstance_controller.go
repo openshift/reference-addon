@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,22 +16,19 @@ import (
 	"github.com/openshift/reference-addon/internal/addonsdk"
 )
 
-type AddonInstanceWatcher struct {
+type AddonInstanceReconciler struct {
 	client.Client
 	StatusReporter  *addonsdk.StatusReporter
 	Log             logr.Logger
 	TargetNamespace string
 }
 
-func (r *AddonInstanceWatcher) Reconcile(
+func (r *AddonInstanceReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	addonInstance := &addonsv1alpha1.AddonInstance{}
 	if err := r.Get(ctx, req.NamespacedName, addonInstance); err != nil {
-		if errors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	r.Log.Info("reporting addon-instance spec change to status-reporter")
@@ -42,10 +38,10 @@ func (r *AddonInstanceWatcher) Reconcile(
 	return ctrl.Result{}, nil
 }
 
-func (r *AddonInstanceWatcher) SetupWithManager(mgr ctrl.Manager) error {
+func (r *AddonInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	addonInstanceConfigurationChangePredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return false
+			return e.Object.GetName() == "addon-instance" && e.Object.GetNamespace() == r.TargetNamespace
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// AddonInstance CR to be watched should be only <target-namespace>/addon-instance

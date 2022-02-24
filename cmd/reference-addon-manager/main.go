@@ -105,18 +105,18 @@ func main() {
 	}
 
 	if err := mgr.Add(statusReporter); err != nil {
-		setupLog.Error(err, "unable to start status-reporter")
+		setupLog.Error(err, "unable to add status-reporter to manager")
 		os.Exit(1)
 	}
 
 	// setup addonInstance spec change watcher
-	addonInstanceWatcher := controllers.AddonInstanceWatcher{
+	addonInstanceSpecChangeReconciler := controllers.AddonInstanceReconciler{
 		Client:          mgr.GetClient(),
 		Log:             ctrl.Log.WithName("controllers").WithName("AddonInstance"),
 		StatusReporter:  statusReporter,
 		TargetNamespace: addonNamespace,
 	}
-	if err = addonInstanceWatcher.SetupWithManager(mgr); err != nil {
+	if err = addonInstanceSpecChangeReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AddonInstance")
 		os.Exit(1)
 	}

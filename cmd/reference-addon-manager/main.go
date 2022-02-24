@@ -93,8 +93,6 @@ func main() {
 		}
 	}
 
-	// fetching the following from the Downwards Api in case of reference-addon.
-	// Can be hardcoded or supplied in any other way too depending on the addon developers.
 	addonName := os.Getenv("ADDON_NAME")
 	addonNamespace := os.Getenv("ADDON_NAMESPACE")
 

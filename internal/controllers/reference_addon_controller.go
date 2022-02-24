@@ -2,9 +2,9 @@ package controllers
 
 import (
 	"context"
-	"strings"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,23 +38,27 @@ func (r *ReferenceAddonReconciler) Reconcile(
 		Message: "The addon resources are improperly named",
 	}
 
-	var conditionsToReport []metav1.Condition
 	// dummy code to indicate reconciliation of the reference-addon object
-	if strings.HasPrefix(req.NamespacedName.Name, "redhat-") {
-		log.Info("reconciling for a reference addon object prefixed by redhat- ")
-		conditionsToReport = []metav1.Condition{successfulCondition}
-	} else if strings.HasPrefix(req.NamespacedName.Name, "reference-addon") {
-		log.Info("reconciling for a reference addon object named reference-addon")
-		conditionsToReport = []metav1.Condition{successfulCondition}
-	} else {
-		log.Info("reconciling for a reference addon object not prefixed by redhat- or named reference-addon")
-		conditionsToReport = []metav1.Condition{failureCondition}
+	if req.NamespacedName.Name != "reference-addon" {
+		log.Info("doing nothing to a ReferenceAddon object not with the name reference-addon")
+		return ctrl.Result{}, nil
 	}
 
+	log.Info("reconciling for a ReferenceAddon object with the name reference-addon")
+	refado := &refapisv1alpha1.ReferenceAddon{}
+	if err := r.Get(ctx, req.NamespacedName, refado); err != nil {
+		// don't report anything new if the CR if found to be deleted/non-existent
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+	}
+	conditionsToReport := []metav1.Condition{failureCondition}
+	if refado.Spec.ReportSuccessfulStatus {
+		conditionsToReport = []metav1.Condition{successfulCondition}
+	}
 	if err := r.StatusReporter.SetConditions(ctx, conditionsToReport); err != nil {
 		return ctrl.Result{}, err
 	}
-
 	return ctrl.Result{}, nil
 }
 

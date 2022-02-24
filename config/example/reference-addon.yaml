@@ -3,3 +3,5 @@ kind: ReferenceAddon
 metadata:
   name: reference-addon
   namespace: reference-addon
+spec:
+  reportSuccessfulStatus: true

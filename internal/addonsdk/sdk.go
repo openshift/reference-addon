@@ -180,11 +180,11 @@ func (sr *statusReporter) SetConditions(ctx context.Context, conditions []metav1
 	}
 }
 
-func (sr *statusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
+func (sr *statusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance *addonsv1alpha1.AddonInstance) error {
 	select {
 	case <-sr.doneCh:
 		return fmt.Errorf("can't report AddonInstance spec change on a stopped StatusReporter")
-	case sr.updateCh <- updateOptions{addonInstance: &newAddonInstance}:
+	case sr.updateCh <- updateOptions{addonInstance: newAddonInstance}:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

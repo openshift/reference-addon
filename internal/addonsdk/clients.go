@@ -21,5 +21,5 @@ type StatusReporterClient interface {
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
 	SetConditions(ctx context.Context, conditions []metav1.Condition) error
-	ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error
+	ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance *addonsv1alpha1.AddonInstance) error
 }

@@ -34,8 +34,7 @@ type StatusReporter struct {
 	ticker   *time.Ticker
 
 	// for effectively communicating the stop and update signals
-	stopperCh chan bool
-	updateCh  chan updateOptions
+	updateCh chan updateOptions
 
 	//for tracking if the heartbeat reporter is running or done running
 	doneCh chan bool
@@ -58,10 +57,9 @@ func SetupStatusReporter(addonInstanceInteractor client, addonName string, addon
 					Message: fmt.Sprintf("Addon %q hasn't reported health yet", addonName),
 				},
 			},
-			stopperCh: make(chan bool),
-			updateCh:  make(chan updateOptions),
-			doneCh:    make(chan bool),
-			log:       logger,
+			updateCh: make(chan updateOptions),
+			doneCh:   make(chan bool),
+			log:      logger,
 		}
 		// because the heartbeat reporter still hasn't been started
 		defer close(statusReporterSingleton.doneCh)
@@ -73,7 +71,7 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	select {
 	case <-sr.doneCh:
-		sr.log.Info("StatusReporter already found to be running. Please explicitly Stop() it first before trying to restart it")
+		sr.log.Info("StatusReporter already found to be running.")
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -111,21 +109,7 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			return nil
-		case <-sr.stopperCh:
-			return nil
 		}
-	}
-}
-
-func (sr *StatusReporter) Stop(ctx context.Context) error {
-	select {
-	case <-sr.doneCh: // will non-blockingly receive whenever doneCh would be closed
-		sr.log.Info("status reporter is already stopped")
-		return nil
-	case sr.stopperCh <- true:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 }
 

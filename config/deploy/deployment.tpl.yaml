@@ -21,9 +21,7 @@ spec:
         image: quay.io/openshift/reference-addon:latest
         env:
         - name: ADDON_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
+          value: reference-addon
         - name: ADDON_NAMESPACE
           valueFrom:
             fieldRef:

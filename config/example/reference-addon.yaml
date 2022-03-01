@@ -4,4 +4,4 @@ metadata:
   name: reference-addon
   namespace: reference-addon
 spec:
-  reportSuccessfulStatus: true
+  reportSuccessfulStatus: "true"

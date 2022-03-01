@@ -36,7 +36,10 @@ spec:
             description: ReferenceAddonSpec defines the desired state of ReferenceAddon.
             properties:
               reportSuccessfulStatus:
-                type: boolean
+                enum:
+                - "true"
+                - "false"
+                type: string
             type: object
           status:
             description: ReferenceAddonStatus defines the observed state of ReferenceAddon

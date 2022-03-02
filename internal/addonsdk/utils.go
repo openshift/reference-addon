@@ -3,6 +3,7 @@ package addonsdk
 import (
 	"context"
 	"fmt"
+	"time"
 
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -10,12 +11,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+var (
+	defaultHeartbeatUpdatePeriod time.Duration = 5 * time.Minute
+)
+
 type updateOptions struct {
 	// for capturing new changes to the addonInstance which the tenants would be watching
-	addonInstance *addonsv1alpha1.AddonInstance
+	addonInstance addonsv1alpha1.AddonInstance
 
 	// for capturing new heartbeats/conditions to be reported
-	conditions *[]metav1.Condition
+	conditions []metav1.Condition
 }
 
 func (sr *StatusReporter) updateAddonInstanceStatus(ctx context.Context, conditions []metav1.Condition) error {

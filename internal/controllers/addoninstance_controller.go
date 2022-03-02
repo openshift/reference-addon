@@ -32,7 +32,7 @@ func (r *AddonInstanceReconciler) Reconcile(
 	}
 
 	r.Log.Info("reporting addon-instance spec change to status-reporter")
-	if err := r.StatusReporter.ReportAddonInstanceSpecChange(ctx, addonInstance); err != nil {
+	if err := r.StatusReporter.ReportAddonInstanceSpecChange(ctx, *addonInstance); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil

@@ -3,6 +3,7 @@ package addonsdk
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -61,7 +62,7 @@ func SetupStatusReporter(addonInstanceInteractor client, addonName string, addon
 			doneCh:   make(chan bool),
 			log:      logger,
 		}
-		// because the heartbeat reporter still hasn't been started
+		// because the status reporter loop still hasn't been started and is available for being started
 		defer close(statusReporterSingleton.doneCh)
 	})
 	return statusReporterSingleton
@@ -70,46 +71,49 @@ func SetupStatusReporter(addonInstanceInteractor client, addonName string, addon
 func (sr *StatusReporter) Start(ctx context.Context) error {
 	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	select {
+	// run status reporter loop only when it's already NOT running i.e. sr.doneCh is closed or in other words, <-sr.doneCh is possible
 	case <-sr.doneCh:
-		sr.log.Info("StatusReporter already found to be running.")
-		return nil
+		sr.doneCh = make(chan bool) // "open" the channel to indicate that a status reporter loop is running
+		defer close(sr.doneCh)
+
+		currentAddonInstance := &addonsv1alpha1.AddonInstance{}
+		if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
+			sr.log.Error(err, "failed to fetch the current heartbeat update period interval")
+			sr.log.Info("initialising the status reporter with the default interval")
+			sr.interval = defaultHeartbeatUpdatePeriod
+		} else {
+			sr.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
+		}
+
+		defer sr.ticker.Stop()
+		sr.ticker = time.NewTicker(sr.interval)
+
+		for {
+			select {
+			case update := <-sr.updateCh:
+				// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
+				// synchronize the timer with this new interval
+				if !reflect.DeepEqual(update.addonInstance, addonsv1alpha1.AddonInstance{}) {
+					if update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration != sr.interval {
+						sr.interval = update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration
+						sr.ticker.Reset(sr.interval)
+					}
+				}
+
+				if update.conditions != nil {
+					sr.latestConditions = update.conditions
+				}
+			case <-sr.ticker.C:
+				if err := sr.updateAddonInstanceStatus(ctx, sr.latestConditions); err != nil {
+					sr.log.Error(err, "failed to report the regular heartbeat")
+				}
+			case <-ctx.Done():
+				sr.log.Info("received signal to stop the status reporter: %w", ctx.Err())
+				return nil
+			}
+		}
 	case <-ctx.Done():
 		return ctx.Err()
-	default:
-	}
-	sr.doneCh = make(chan bool)
-	defer close(sr.doneCh)
-
-	currentAddonInstance := &addonsv1alpha1.AddonInstance{}
-	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
-		return fmt.Errorf("error occurred while fetching the current heartbeat update period interval: %w", err)
-	}
-	sr.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration
-	defer sr.ticker.Stop()
-	sr.ticker = time.NewTicker(sr.interval)
-
-	for {
-		select {
-		case update := <-sr.updateCh:
-			// update the interval if the newInterval in the `update` is provided and is not equal to the existing interval
-			// synchronize the timer with this new interval
-			if update.addonInstance != nil {
-				if update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration != sr.interval {
-					sr.interval = update.addonInstance.Spec.HeartbeatUpdatePeriod.Duration
-					sr.ticker.Reset(sr.interval)
-				}
-			}
-
-			if update.conditions != nil {
-				sr.latestConditions = *update.conditions
-			}
-		case <-sr.ticker.C:
-			if err := sr.updateAddonInstanceStatus(ctx, sr.latestConditions); err != nil {
-				sr.log.Error(err, "failed to report the regular heartbeat")
-			}
-		case <-ctx.Done():
-			return nil
-		}
 	}
 }
 
@@ -152,7 +156,7 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 	case <-sr.doneCh:
 		sr.log.Info("StatusReporter found to be stopped")
 		return nil
-	case sr.updateCh <- updateOptions{conditions: &conditions}: // near-instantly received by the StatusReporter loop
+	case sr.updateCh <- updateOptions{conditions: conditions}: // near-instantly received by the StatusReporter loop
 		return nil
 	case <-ctx.Done():
 		sr.log.Error(ctx.Err(), "failed to send the heartbeat's Conditions to the StatusReporter")
@@ -166,7 +170,7 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 	}
 }
 
-func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance *addonsv1alpha1.AddonInstance) error {
+func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
 	select {
 	case <-sr.doneCh:
 		return fmt.Errorf("can't report AddonInstance spec change on a stopped StatusReporter")

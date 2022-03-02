@@ -79,7 +79,7 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 		currentAddonInstance := &addonsv1alpha1.AddonInstance{}
 		if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
 			sr.log.Error(err, "failed to fetch the current heartbeat update period interval")
-			sr.log.Info("initialising the status reporter with the default interval")
+			sr.log.Info("initialising the status reporter with the default interval", "period", defaultHeartbeatUpdatePeriod)
 			sr.interval = defaultHeartbeatUpdatePeriod
 		} else {
 			sr.interval = currentAddonInstance.Spec.HeartbeatUpdatePeriod.Duration

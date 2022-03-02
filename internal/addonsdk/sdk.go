@@ -38,7 +38,8 @@ type StatusReporter struct {
 	updateCh chan updateOptions
 
 	//for tracking if the heartbeat reporter is running or done running
-	doneCh chan bool
+	doneCh      chan bool
+	doneChMutex sync.RWMutex
 
 	log logr.Logger
 }
@@ -67,12 +68,16 @@ func SetupStatusReporter(addonInstanceInteractor client, addonName string, addon
 }
 
 func (sr *StatusReporter) Start(ctx context.Context) error {
+	sr.doneChMutex.Lock()
 	select {
 	// sr.doneCh is a buffered channel of capacity 1, which ensures that only one "non-blocking send" (case sr.doneCh <- true) can happen to it successfully when it's empty, else it will be blocked till either ctx.Done() happens or the `sr.doneCh` gets freed ("released by the previous caller").
 	// this ensures concurrency-safely executing only one status reporter loop at a time
 	case sr.doneCh <- true:
 		// defer freeing up the sr.doneCh for the next caller "in queue" to successfully start the status reporter loop
+		sr.doneChMutex.Unlock()
 		defer func() {
+			sr.doneChMutex.Lock()
+			defer sr.doneChMutex.Unlock()
 			<-sr.doneCh
 		}()
 
@@ -113,14 +118,14 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 			}
 		}
 	case <-ctx.Done():
+		sr.doneChMutex.Unlock()
 		return ctx.Err()
 	}
 }
 
 func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
-	// this `if` might get unintendedly bypassed when say, the status reporter loop gets abruptly stopped "after" the following `if` check is done.
-	// but even in that case, the `select` section would be blocked until ctx.Done() or a new instance of status reporter loop (i.e. a new receiver of sr.updateCh) starts and gets ready to receive a value on the end of `sr.updateCh`
-	// thereby not leading to any grave consequences
+	sr.doneChMutex.RLock()
+	defer sr.doneChMutex.RUnlock()
 	if len(sr.doneCh) == 0 {
 		sr.log.Info("StatusReporter found to be stopped")
 		return nil
@@ -150,9 +155,8 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 }
 
 func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
-	// this `if` might get unintendedly bypassed when say, the status reporter loop gets abruptly stopped "after" the following `if` check is done.
-	// but even in that case, the `select` section would be blocked until ctx.Done() or a new instance of status reporter loop (i.e. a new receiver of sr.updateCh) starts and gets ready to receive a value on the end of `sr.updateCh`
-	// thereby not leading to any grave consequences
+	sr.doneChMutex.RLock()
+	defer sr.doneChMutex.RUnlock()
 	if len(sr.doneCh) == 0 {
 		return fmt.Errorf("can't report AddonInstance spec change on a stopped StatusReporter")
 	}

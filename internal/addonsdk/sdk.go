@@ -59,22 +59,22 @@ func SetupStatusReporter(addonInstanceInteractor client, addonName string, addon
 				},
 			},
 			updateCh: make(chan updateOptions),
-			doneCh:   make(chan bool),
+			doneCh:   make(chan bool, 1),
 			log:      logger,
 		}
-		// because the status reporter loop still hasn't been started and is available for being started
-		defer close(statusReporterSingleton.doneCh)
 	})
 	return statusReporterSingleton
 }
 
 func (sr *StatusReporter) Start(ctx context.Context) error {
-	// ensures to tie only one heartbeat-reporter loop at a time to a StatusReporter object
 	select {
-	// run status reporter loop only when it's already NOT running i.e. sr.doneCh is closed or in other words, <-sr.doneCh is possible
-	case <-sr.doneCh:
-		sr.doneCh = make(chan bool) // "open" the channel to indicate that a status reporter loop is running
-		defer close(sr.doneCh)
+	// sr.doneCh is a buffered channel of capacity 1, which ensures that only one "non-blocking send" (case sr.doneCh <- true) can happen to it successfully when it's empty, else it will be blocked till either ctx.Done() happens or the `sr.doneCh` gets freed ("released by the previous caller").
+	// this ensures concurrency-safely executing only one status reporter loop at a time
+	case sr.doneCh <- true:
+		// defer freeing up the sr.doneCh for the next caller "in queue" to successfully start the status reporter loop
+		defer func() {
+			<-sr.doneCh
+		}()
 
 		currentAddonInstance := &addonsv1alpha1.AddonInstance{}
 		if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, currentAddonInstance); err != nil {
@@ -108,7 +108,7 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 					sr.log.Error(err, "failed to report the regular heartbeat")
 				}
 			case <-ctx.Done():
-				sr.log.Info("received signal to stop the status reporter: %w", ctx.Err())
+				sr.log.Info("received signal to stop the status reporter", "reason", ctx.Err())
 				return nil
 			}
 		}
@@ -118,62 +118,45 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 }
 
 func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
-	// immediately register a new heartbeat upon receive one from the client/tenant side
-	addonInstance := &addonsv1alpha1.AddonInstance{}
-	if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
-		return fmt.Errorf("failed to get the AddonInstance: %w", err)
-	}
-
-	// making a deep-copy for current Conditions for rolling back in case of failures
-	previousConditions := make([]metav1.Condition, len(addonInstance.Status.Conditions))
-	copy(previousConditions, addonInstance.Status.Conditions)
-
-	newConditions := addonInstance.Status.Conditions
-	for _, condition := range conditions {
-		meta.SetStatusCondition(&newConditions, condition)
-	}
-	addonInstance.Status.Conditions = newConditions
-	addonInstance.Status.ObservedGeneration = addonInstance.Generation
-	addonInstance.Status.LastHeartbeatTime = metav1.Now()
-
-	if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
-		return fmt.Errorf("failed to update AddonInstance Status: %w", err)
-	}
-
-	// rollbackAddonInstanceStatusUpdate() will be called when the `conditions` would fail to be sent on the `sr.updateCh` channel
-	rollbackAddonInstanceStatusUpdate := func() error {
-		addonInstance.Status.Conditions = previousConditions
-		addonInstance.Status.LastHeartbeatTime = metav1.Now()
-
-		// can't use `ctx` for this update because this rollback would be called `ctx` would be `Done()` meaning that feeding `ctx` to the following rollbacked update would fail it too
-		if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(context.TODO(), addonInstance); err != nil {
-			return fmt.Errorf("failed to update AddonInstance Status: %w", err)
-		}
-		return nil
-	}
-
-	select {
-	case <-sr.doneCh:
+	// this `if` might get unintendedly bypassed when say, the status reporter loop gets abruptly stopped "after" the following `if` check is done.
+	// but even in that case, the `select` section would be blocked until ctx.Done() or a new instance of status reporter loop (i.e. a new receiver of sr.updateCh) starts and gets ready to receive a value on the end of `sr.updateCh`
+	// thereby not leading to any grave consequences
+	if len(sr.doneCh) == 0 {
 		sr.log.Info("StatusReporter found to be stopped")
 		return nil
+	}
+	select {
 	case sr.updateCh <- updateOptions{conditions: conditions}: // near-instantly received by the StatusReporter loop
+		addonInstance := &addonsv1alpha1.AddonInstance{}
+		if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
+			return fmt.Errorf("failed to get the AddonInstance: %w", err)
+		}
+		newConditions := addonInstance.Status.Conditions
+		for _, condition := range conditions {
+			meta.SetStatusCondition(&newConditions, condition)
+		}
+		addonInstance.Status.Conditions = newConditions
+		addonInstance.Status.ObservedGeneration = addonInstance.Generation
+		addonInstance.Status.LastHeartbeatTime = metav1.Now()
+
+		if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
+			sr.log.Error(err, "failed to set Conditions[] on AddonInstance, please wait for the next iteration of the status reporter loop to register these Conditions[]")
+		}
 		return nil
 	case <-ctx.Done():
 		sr.log.Error(ctx.Err(), "failed to send the heartbeat's Conditions to the StatusReporter")
-		sr.log.Info("rolling back the AddonInstance Status update...")
-		// not 100% full-proof rollback because in theory, the rollback could still fail.
-		// Yet in that case too, eventual consistency would still be preserved because our AddonInstance.Status.Conditions would get re-synchronized to `sr.latestConditions` in the next iteration of the StatusReporter loop.
-		if err := rollbackAddonInstanceStatusUpdate(); err != nil {
-			return fmt.Errorf("failed to rollback the AddonInstance Status update: %w", err)
-		}
 		return nil
 	}
 }
 
 func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
-	select {
-	case <-sr.doneCh:
+	// this `if` might get unintendedly bypassed when say, the status reporter loop gets abruptly stopped "after" the following `if` check is done.
+	// but even in that case, the `select` section would be blocked until ctx.Done() or a new instance of status reporter loop (i.e. a new receiver of sr.updateCh) starts and gets ready to receive a value on the end of `sr.updateCh`
+	// thereby not leading to any grave consequences
+	if len(sr.doneCh) == 0 {
 		return fmt.Errorf("can't report AddonInstance spec change on a stopped StatusReporter")
+	}
+	select {
 	case sr.updateCh <- updateOptions{addonInstance: newAddonInstance}:
 		return nil
 	case <-ctx.Done():

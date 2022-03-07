@@ -43,6 +43,9 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
+	addonName := os.Getenv("ADDON_NAME")
+	addonNamespace := os.Getenv("ADDON_NAMESPACE")
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         metricsAddr,
@@ -50,6 +53,7 @@ func main() {
 		LeaderElectionResourceLock: "leases",
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionID:           "8a4hp84a6s.addon-operator-lock",
+		Namespace:                  addonNamespace, // Cache only the objects residing in <target-namespace>
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -92,9 +96,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	addonName := os.Getenv("ADDON_NAME")
-	addonNamespace := os.Getenv("ADDON_NAMESPACE")
 
 	// Setup the StatusReporter
 	addonSdkClient := NewAddonSDKClient(mgr.GetClient())

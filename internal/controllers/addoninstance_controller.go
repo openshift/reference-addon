@@ -26,6 +26,10 @@ type AddonInstanceReconciler struct {
 func (r *AddonInstanceReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
+	if req.NamespacedName.Name != "addon-instance" {
+		return ctrl.Result{}, nil
+	}
+
 	addonInstance := &addonsv1alpha1.AddonInstance{}
 	if err := r.Get(ctx, req.NamespacedName, addonInstance); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -41,12 +45,11 @@ func (r *AddonInstanceReconciler) Reconcile(
 func (r *AddonInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	addonInstanceConfigurationChangePredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return e.Object.GetName() == "addon-instance" && e.Object.GetNamespace() == r.TargetNamespace
+			return true
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			// AddonInstance CR to be watched should be only <target-namespace>/addon-instance
 			// ignore updates to .status in which case metadata.generation does not change
-			return e.ObjectNew.GetName() == "addon-instance" && e.ObjectNew.GetNamespace() == r.TargetNamespace && e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+			return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			return false

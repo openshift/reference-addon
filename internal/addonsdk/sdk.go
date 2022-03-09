@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-logr/logr"
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -37,9 +36,9 @@ type StatusReporter struct {
 	// for effectively communicating the stop and update signals
 	updateCh chan updateOptions
 
-	//for tracking if the heartbeat reporter is running or done running
-	doneCh      chan bool
-	doneChMutex sync.RWMutex
+	//for tracking if the heartbeat reporter runner
+	runnersCh      chan bool
+	runnersChMutex sync.RWMutex
 
 	log logr.Logger
 }
@@ -59,26 +58,26 @@ func SetupStatusReporter(addonInstanceInteractor client, addonName string, addon
 					Message: fmt.Sprintf("Addon %q hasn't reported health yet", addonName),
 				},
 			},
-			updateCh: make(chan updateOptions),
-			doneCh:   make(chan bool, 1),
-			log:      logger,
+			updateCh:  make(chan updateOptions),
+			runnersCh: make(chan bool, 1),
+			log:       logger,
 		}
 	})
 	return statusReporterSingleton
 }
 
 func (sr *StatusReporter) Start(ctx context.Context) error {
-	sr.doneChMutex.Lock()
+	sr.runnersChMutex.Lock()
 	select {
-	// sr.doneCh is a buffered channel of capacity 1, which ensures that only one "non-blocking send" (case sr.doneCh <- true) can happen to it successfully when it's empty, else it will be blocked till either ctx.Done() happens or the `sr.doneCh` gets freed ("released by the previous caller").
+	// sr.runnersCh is a buffered channel of capacity 1, which ensures that only one "non-blocking send" (case sr.runnersCh <- true) can happen to it successfully when it's empty, else it will be blocked till either ctx.Done() happens or the `sr.runnersCh` gets freed ("released by the previous caller").
 	// this ensures concurrency-safely executing only one status reporter loop at a time
-	case sr.doneCh <- true:
-		// defer freeing up the sr.doneCh for the next caller "in queue" to successfully start the status reporter loop
-		sr.doneChMutex.Unlock()
+	case sr.runnersCh <- true:
+		// defer freeing up the sr.runnersCh for the next caller "in queue" to successfully start the status reporter loop
+		sr.runnersChMutex.Unlock()
 		defer func() {
-			sr.doneChMutex.Lock()
-			defer sr.doneChMutex.Unlock()
-			<-sr.doneCh
+			sr.runnersChMutex.Lock()
+			defer sr.runnersChMutex.Unlock()
+			<-sr.runnersCh
 		}()
 
 		currentAddonInstance := &addonsv1alpha1.AddonInstance{}
@@ -118,33 +117,21 @@ func (sr *StatusReporter) Start(ctx context.Context) error {
 			}
 		}
 	case <-ctx.Done():
-		sr.doneChMutex.Unlock()
+		sr.runnersChMutex.Unlock()
 		return ctx.Err()
 	}
 }
 
 func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1.Condition) error {
-	sr.doneChMutex.RLock()
-	defer sr.doneChMutex.RUnlock()
-	if len(sr.doneCh) == 0 {
+	sr.runnersChMutex.RLock()
+	defer sr.runnersChMutex.RUnlock()
+	if len(sr.runnersCh) == 0 {
 		sr.log.Info("StatusReporter found to be stopped")
 		return nil
 	}
 	select {
 	case sr.updateCh <- updateOptions{conditions: conditions}: // near-instantly received by the StatusReporter loop
-		addonInstance := &addonsv1alpha1.AddonInstance{}
-		if err := sr.addonInstanceInteractor.GetAddonInstance(ctx, types.NamespacedName{Name: "addon-instance", Namespace: sr.addonTargetNamespace}, addonInstance); err != nil {
-			return fmt.Errorf("failed to get the AddonInstance: %w", err)
-		}
-		newConditions := addonInstance.Status.Conditions
-		for _, condition := range conditions {
-			meta.SetStatusCondition(&newConditions, condition)
-		}
-		addonInstance.Status.Conditions = newConditions
-		addonInstance.Status.ObservedGeneration = addonInstance.Generation
-		addonInstance.Status.LastHeartbeatTime = metav1.Now()
-
-		if err := sr.addonInstanceInteractor.UpdateAddonInstanceStatus(ctx, addonInstance); err != nil {
+		if err := sr.updateAddonInstanceStatus(ctx, conditions); err != nil {
 			sr.log.Error(err, "failed to set Conditions[] on AddonInstance, please wait for the next iteration of the status reporter loop to register these Conditions[]")
 		}
 		return nil
@@ -155,9 +142,9 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 }
 
 func (sr *StatusReporter) ReportAddonInstanceSpecChange(ctx context.Context, newAddonInstance addonsv1alpha1.AddonInstance) error {
-	sr.doneChMutex.RLock()
-	defer sr.doneChMutex.RUnlock()
-	if len(sr.doneCh) == 0 {
+	sr.runnersChMutex.RLock()
+	defer sr.runnersChMutex.RUnlock()
+	if len(sr.runnersCh) == 0 {
 		return fmt.Errorf("can't report AddonInstance spec change on a stopped StatusReporter")
 	}
 	select {

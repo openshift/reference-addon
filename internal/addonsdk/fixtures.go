@@ -1,6 +1,7 @@
 package addonsdk
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -47,4 +48,14 @@ func WithClient(client *testutil.Client) StatusReporterOpt {
 	return StatusReporterOpt(func(s *StatusReporter) {
 		s.addonInstanceInteractor = testutil.NewAddonSdkClientMock(client)
 	})
+}
+
+func NewStatusReporterRunner(ctx context.Context, s *StatusReporter) {
+	for {
+		select {
+		case <-s.updateCh:
+		case <-ctx.Done():
+			return
+		}
+	}
 }

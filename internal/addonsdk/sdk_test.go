@@ -54,15 +54,7 @@ func TestAddonSDKReportAddonInstanceSpecChange(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel() //cleanup
 
-		go func(ctx context.Context) {
-			for {
-				select {
-				case <-s.updateCh:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}(ctx)
+		go NewStatusReporterRunner(ctx, s)
 
 		testAddonInstance := addonsv1alpha1.AddonInstance{
 			ObjectMeta: metav1.ObjectMeta{
@@ -125,15 +117,7 @@ func TestAddonSDKSetConditions(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel() //cleanup
 
-		go func(ctx context.Context) {
-			for {
-				select {
-				case <-s.updateCh:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}(ctx)
+		go NewStatusReporterRunner(ctx, s)
 
 		testConditions := []metav1.Condition{
 			{

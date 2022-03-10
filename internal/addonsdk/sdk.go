@@ -126,8 +126,7 @@ func (sr *StatusReporter) SetConditions(ctx context.Context, conditions []metav1
 	sr.runnersChMutex.RLock()
 	defer sr.runnersChMutex.RUnlock()
 	if len(sr.runnersCh) == 0 {
-		sr.log.Info("StatusReporter found to be stopped")
-		return nil
+		return fmt.Errorf("StatusReporter found to be stopped: can't set conditions to a stopped StatusReporter")
 	}
 	select {
 	case sr.updateCh <- updateOptions{conditions: conditions}: // near-instantly received by the StatusReporter loop

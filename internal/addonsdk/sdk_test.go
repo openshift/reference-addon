@@ -18,12 +18,7 @@ func TestAddonSDKReportAddonInstanceSpecChange(t *testing.T) {
 		t.Parallel()
 		s := NewTestStatusReporter(t)
 
-		testAddonInstance := addonsv1alpha1.AddonInstance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "addon-instance",
-				Namespace: "reference-addon",
-			},
-		}
+		testAddonInstance := NewTestAddonInstance()
 
 		err := s.ReportAddonInstanceSpecChange(context.TODO(), testAddonInstance)
 		assert.EqualError(t, err, "can't report AddonInstance spec change on a stopped StatusReporter")
@@ -36,12 +31,7 @@ func TestAddonSDKReportAddonInstanceSpecChange(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		cancel() // marking the ctx as `Done`
 
-		testAddonInstance := addonsv1alpha1.AddonInstance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "addon-instance",
-				Namespace: "reference-addon",
-			},
-		}
+		testAddonInstance := NewTestAddonInstance()
 
 		err := s.ReportAddonInstanceSpecChange(ctx, testAddonInstance)
 		assert.EqualError(t, err, ctx.Err().Error())
@@ -56,14 +46,9 @@ func TestAddonSDKReportAddonInstanceSpecChange(t *testing.T) {
 
 		go NewStatusReporterRunner(ctx, s)
 
-		testAddonInstance := addonsv1alpha1.AddonInstance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "addon-instance",
-				Namespace: "reference-addon",
-			},
-		}
+		testAddonInstance := NewTestAddonInstance()
 
-		err := s.ReportAddonInstanceSpecChange(context.TODO(), testAddonInstance)
+		err := s.ReportAddonInstanceSpecChange(ctx, testAddonInstance)
 		assert.NoError(t, err)
 	})
 }
@@ -96,12 +81,7 @@ func TestAddonSDKSetConditions(t *testing.T) {
 			mock.IsType(types.NamespacedName{}),
 			mock.IsType(&addonsv1alpha1.AddonInstance{}),
 		).Run(func(args mock.Arguments) {
-			adi := &addonsv1alpha1.AddonInstance{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "addon-instance",
-					Namespace: "reference-addon",
-				},
-			}
+			adi := NewTestAddonInstance()
 			adi.DeepCopyInto(args.Get(2).(*addonsv1alpha1.AddonInstance))
 		}).Return(nil)
 

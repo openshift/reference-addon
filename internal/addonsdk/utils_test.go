@@ -51,7 +51,6 @@ func TestUpdateAddonInstanceStatus(t *testing.T) {
 			t.Parallel()
 
 			c := testutil.NewClient()
-			log := testutil.NewLogger(t)
 
 			var getReturnArguments, updateReturnArguments error
 
@@ -69,12 +68,7 @@ func TestUpdateAddonInstanceStatus(t *testing.T) {
 				mock.IsType(types.NamespacedName{}),
 				mock.IsType(&addonsv1alpha1.AddonInstance{}),
 			).Run(func(args mock.Arguments) {
-				adi := &addonsv1alpha1.AddonInstance{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "addon-instance",
-						Namespace: "reference-addon",
-					},
-				}
+				adi := NewTestAddonInstance()
 				adi.DeepCopyInto(args.Get(2).(*addonsv1alpha1.AddonInstance))
 			}).Return(getReturnArguments)
 
@@ -85,12 +79,7 @@ func TestUpdateAddonInstanceStatus(t *testing.T) {
 				mock.Anything,
 			).Return(updateReturnArguments)
 
-			testStatusReporter := StatusReporter{
-				addonInstanceInteractor: testutil.NewAddonSdkClientMock(c),
-				addonName:               "test-reference-addon",
-				addonTargetNamespace:    "reference-addon",
-				log:                     log,
-			}
+			testStatusReporter := NewTestStatusReporter(t, WithClient(c))
 			testConditions := []metav1.Condition{
 				{
 					Type:    AddonHealthyConditionType,

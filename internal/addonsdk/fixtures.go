@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 
 	"github.com/openshift/reference-addon/internal/testutil"
 )
@@ -57,5 +60,17 @@ func NewStatusReporterRunner(ctx context.Context, s *StatusReporter) {
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+func NewTestAddonInstance() addonsv1alpha1.AddonInstance {
+	return addonsv1alpha1.AddonInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "addon-instance",
+			Namespace: "reference-addon",
+		},
+		Spec: addonsv1alpha1.AddonInstanceSpec{
+			HeartbeatUpdatePeriod: metav1.Duration{Duration: 10 * time.Second},
+		},
 	}
 }

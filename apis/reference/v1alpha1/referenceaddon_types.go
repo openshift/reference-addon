@@ -6,6 +6,8 @@ import (
 
 // ReferenceAddonSpec defines the desired state of ReferenceAddon.
 type ReferenceAddonSpec struct {
+	// +kubebuilder:validation:Enum="true";"false"
+	ReportSuccessfulStatus string `json:"reportSuccessfulStatus,omitempty"`
 }
 
 // ReferenceAddonStatus defines the observed state of ReferenceAddon

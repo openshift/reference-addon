@@ -19,6 +19,13 @@ spec:
       containers:
       - name: manager
         image: quay.io/openshift/reference-addon:latest
+        env:
+        - name: ADDON_NAME
+          value: reference-addon
+        - name: ADDON_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         args:
         - --enable-leader-election
         resources:

@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	refapis "github.com/openshift/reference-addon/apis"
+	"github.com/openshift/reference-addon/internal/addonsdk"
 	"github.com/openshift/reference-addon/internal/controllers"
 )
 
@@ -42,6 +43,9 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
+	addonName := os.Getenv("ADDON_NAME")
+	addonNamespace := os.Getenv("ADDON_NAMESPACE")
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         metricsAddr,
@@ -49,6 +53,7 @@ func main() {
 		LeaderElectionResourceLock: "leases",
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionID:           "8a4hp84a6s.addon-operator-lock",
+		Namespace:                  addonNamespace, // Cache only the objects residing in <target-namespace>
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -92,11 +97,36 @@ func main() {
 		}
 	}
 
+	// Setup the StatusReporter
+	addonSdkClient := NewAddonSDKClient(mgr.GetClient())
+	statusReporter := addonsdk.SetupStatusReporter(addonSdkClient, addonName, addonNamespace, ctrl.Log.WithName("StatusReporter"))
+	if err != nil {
+		setupLog.Error(err, "unable to setup status-reporter")
+		os.Exit(1)
+	}
+
+	if err := mgr.Add(statusReporter); err != nil {
+		setupLog.Error(err, "unable to add status-reporter to manager")
+		os.Exit(1)
+	}
+
+	// setup addonInstance spec change watcher
+	addonInstanceSpecChangeReconciler := controllers.AddonInstanceReconciler{
+		Client:          mgr.GetClient(),
+		Log:             ctrl.Log.WithName("controllers").WithName("AddonInstance"),
+		StatusReporter:  statusReporter,
+		TargetNamespace: addonNamespace,
+	}
+	if err = addonInstanceSpecChangeReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AddonInstance")
+		os.Exit(1)
+	}
+
 	// the following section hooks up a heartbeat reporter with the current addon/operator
 	r := controllers.ReferenceAddonReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
+		StatusReporter: statusReporter,
 	}
 
 	if err = r.SetupWithManager(mgr); err != nil {

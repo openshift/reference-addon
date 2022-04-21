@@ -15,6 +15,8 @@ import (
 
 	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
+	"github.com/openshift/reference-addon/pkg"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -103,6 +105,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")
 		os.Exit(1)
 	}
+
+	// register and fill metrics
+	registry := prometheus.NewRegistry()
+	pkg.RegisterMetrics(registry)
+	pkg.AddURLResponseMetrics()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

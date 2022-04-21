@@ -15,7 +15,7 @@ import (
 
 	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
-	"github.com/openshift/reference-addon/pkg"
+	"github.com/openshift/reference-addon/internal/metrics"
 )
 
 var (
@@ -106,8 +106,8 @@ func main() {
 	}
 
 	// register and fill metrics
-	pkg.RegisterMetrics()
-	pkg.AddURLResponseMetrics()
+	metrics.RegisterMetrics()
+	metrics.RequestSampleResponseData()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

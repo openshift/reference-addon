@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
-	"github.com/openshift/reference-addon/pkg"
+	"github.com/openshift/reference-addon/internal/metrics"
 )
 
 type ReferenceAddonReconciler struct {
@@ -33,7 +33,7 @@ func (r *ReferenceAddonReconciler) Reconcile(
 	}
 
 	// add sample metrics
-	pkg.AddURLResponseMetrics()
+	metrics.RequestSampleResponseData()
 
 	return ctrl.Result{}, nil
 }

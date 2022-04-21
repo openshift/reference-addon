@@ -1,4 +1,4 @@
-package pkg
+package metrics
 
 import (
 	"net/http"
@@ -11,17 +11,17 @@ import (
 var (
 	externalURLs = []string{"https://httpstat.us/503", "https://httpstat.us/200"}
 
-	urlResponseCode = prometheus.NewGaugeVec(
+	availability = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "reference_addon_sample_response_code",
-			Help: "external url response.",
+			Name: "reference_addon_sample_availability",
+			Help: "external url availability.",
 		},
 		[]string{"url"},
 	)
-	urlResponseTime = prometheus.NewGaugeVec(
+	responseTime = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "reference_addon_sample_response_time",
-			Help: "external url response time.",
+			Help: "external url response time taken.",
 		},
 		[]string{"url"},
 	)
@@ -29,15 +29,15 @@ var (
 
 // RegisterMetrics must register metrics in given registry collector
 func RegisterMetrics() {
-	ctrlmetrics.Registry.MustRegister(urlResponseCode)
-	ctrlmetrics.Registry.MustRegister(urlResponseTime)
+	ctrlmetrics.Registry.MustRegister(availability)
+	ctrlmetrics.Registry.MustRegister(responseTime)
 }
 
-func AddURLResponseMetrics() {
+func RequestSampleResponseData() {
 	for _, externalURL := range externalURLs {
-		status, responseTime := callExternalURL(externalURL)
-		urlResponseCode.WithLabelValues(externalURL).Set(status)
-		urlResponseTime.WithLabelValues(externalURL).Set(responseTime)
+		status, timeTaken := callExternalURL(externalURL)
+		availability.WithLabelValues(externalURL).Set(status)
+		responseTime.WithLabelValues(externalURL).Set(timeTaken)
 	}
 }
 
@@ -47,10 +47,11 @@ func callExternalURL(externalURL string) (float64, float64) {
 	if err != nil {
 		return 0, 0
 	}
-	responseTime := time.Since(start).Milliseconds()
+	defer response.Body.Close()
+	timeTaken := time.Since(start).Milliseconds()
 	status := 0
 	if response.StatusCode == 200 {
 		status = 1
 	}
-	return float64(status), float64(responseTime)
+	return float64(status), float64(timeTaken)
 }

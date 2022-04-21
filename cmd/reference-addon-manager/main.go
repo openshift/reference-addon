@@ -16,7 +16,6 @@ import (
 	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/openshift/reference-addon/pkg"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -107,8 +106,7 @@ func main() {
 	}
 
 	// register and fill metrics
-	registry := prometheus.NewRegistry()
-	pkg.RegisterMetrics(registry)
+	pkg.RegisterMetrics()
 	pkg.AddURLResponseMetrics()
 
 	setupLog.Info("starting manager")

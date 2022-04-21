@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (
@@ -27,9 +28,9 @@ var (
 )
 
 // RegisterMetrics must register metrics in given registry collector
-func RegisterMetrics(registry *prometheus.Registry) {
-	registry.MustRegister(urlResponseCode)
-	registry.MustRegister(urlResponseTime)
+func RegisterMetrics() {
+	ctrlmetrics.Registry.MustRegister(urlResponseCode)
+	ctrlmetrics.Registry.MustRegister(urlResponseTime)
 }
 
 func AddURLResponseMetrics() {

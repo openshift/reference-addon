@@ -14,7 +14,7 @@ var (
 	availability = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "reference_addon_sample_availability",
-			Help: "external url availability.",
+			Help: "external url availability 0-not available and 1-available.",
 		},
 		[]string{"url"},
 	)

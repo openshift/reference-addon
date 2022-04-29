@@ -15,6 +15,7 @@ import (
 
 	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
+	"github.com/openshift/reference-addon/internal/metrics"
 )
 
 var (
@@ -103,6 +104,10 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")
 		os.Exit(1)
 	}
+
+	// register and fill metrics
+	metrics.RegisterMetrics()
+	metrics.RequestSampleResponseData()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

@@ -364,6 +364,10 @@ build-image-reference-addon-bundle: \
 		mkdir -p ".cache/image/${IMAGE_NAME}/manifests"; \
 		mkdir -p ".cache/image/${IMAGE_NAME}/metadata"; \
 		cp -a "config/olm/reference-addon.csv.yaml" ".cache/image/${IMAGE_NAME}/manifests"; \
+		cp -a "config/deploy/metrics-service.yaml" ".cache/image/${IMAGE_NAME}/manifests"; \
+		cp -a "config/deploy/monitoring-stack.yaml" ".cache/image/${IMAGE_NAME}/manifests"; \
+		cp -a "config/deploy/prometheus-rule.yaml" ".cache/image/${IMAGE_NAME}/manifests"; \
+		cp -a "config/deploy/service-monitor.yaml" ".cache/image/${IMAGE_NAME}/manifests"; \
 		cp -a "config/olm/annotations.yaml" ".cache/image/${IMAGE_NAME}/metadata"; \
 		cp -a "config/docker/${IMAGE_NAME}.Dockerfile" ".cache/image/${IMAGE_NAME}/Dockerfile"; \
 		$$CONTAINER_COMMAND build -t "${IMAGE_ORG}/${IMAGE_NAME}:${VERSION}" ".cache/image/${IMAGE_NAME}"; \

@@ -6,8 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: reference-addon
 spec:
-  logLevel: debug
-  retention: 1d
+  logLevel: info
+  retention: 5d
   resourceSelector:
     matchLabels:
       app.kubernetes.io/name: reference-addon

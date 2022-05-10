@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: reference-addon-metrics
+  namespace: redhat-reference-addon
+  labels:
+    app.kubernetes.io/name: reference-addon
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app.kubernetes.io/name: reference-addon

@@ -26,6 +26,9 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = refapis.AddToScheme(scheme)
+
+	// Register metrics with the global Prometheus registry
+	metrics.RegisterMetrics()
 }
 
 func main() {
@@ -105,8 +108,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// register and fill metrics
-	metrics.RegisterMetrics()
+	// add sample metrics
 	metrics.RequestSampleResponseData()
 
 	setupLog.Info("starting manager")

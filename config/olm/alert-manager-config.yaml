@@ -2,7 +2,6 @@ apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
   name: alertmanageconfig-ra
-  namespace: redhat-reference-addon
   labels:
     app.kubernetes.io/name: reference-addon
 spec:

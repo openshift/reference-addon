@@ -2,7 +2,6 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: reference-addon-pr
-  namespace: redhat-reference-addon
   labels:
     app.kubernetes.io/name: reference-addon
     prometheus: reference-addon

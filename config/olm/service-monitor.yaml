@@ -1,7 +1,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: reference-addon-servicemonitor
+  name: reference-addon-sm
   labels:
       app.kubernetes.io/name: reference-addon
 spec:

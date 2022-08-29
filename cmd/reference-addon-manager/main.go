@@ -18,6 +18,7 @@ import (
 	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/openshift/reference-addon/internal/metrics"
+	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 )
 
 var (
@@ -28,10 +29,17 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = refapis.AddToScheme(scheme)
+	_ = opsv1alpha1.AddToScheme(scheme)
 
 	// Register metrics with the global Prometheus registry
 	metrics.RegisterMetrics()
 }
+
+const (
+	addonNamespace = "redhat-reference-addon"
+	operatorName   = "reference-addon"
+	deleteLabel    = "addon-reference-addon-delete"
+)
 
 func main() {
 	var (
@@ -113,19 +121,26 @@ func main() {
 		os.Exit(1)
 	}
 	// the following section hooks up a heartbeat reporter with the current addon/operator
-	r := controllers.ReferenceAddonReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ReferenceAddon"),
-		Scheme: mgr.GetScheme(),
-	}
-
-	if err = r.SetupWithManager(mgr); err != nil {
+	r, err := controllers.NewReferenceAddonReconciler(
+		mgr.GetClient(),
+		controllers.WithLog{Log: ctrl.Log.WithName("controllers").WithName("ReferenceAddon")},
+		controllers.WithAddonNamespace(addonNamespace),
+		controllers.WithOperatorName(operatorName),
+		controllers.WithDeleteLabel(deleteLabel),
+	)
+	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")
 		os.Exit(1)
 	}
 
-	// add sample metrics
-	metrics.RequestSampleResponseData()
+	if err := r.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup controller", "controller", "ReferenceAddon")
+		os.Exit(1)
+	}
+
+	// ensure at least one data point for sample metrics
+	sampler := metrics.NewResponseSamplerImpl()
+	sampler.RequestSampleResponseData("https://httpstat.us/503", "https://httpstat.us/200")
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

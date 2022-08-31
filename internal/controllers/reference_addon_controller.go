@@ -34,7 +34,7 @@ func NewReferenceAddonReconciler(client client.Client, opts ...ReferenceAddonRec
 
 	return &ReferenceAddonReconciler{
 		cfg: cfg,
-		phases: []phase.Phase{
+		orderedPhases: []phase.Phase{
 			NewPhaseUninstall(
 				signaler,
 				NewUninstallerImpl(client, NewCSVListerImpl(client)),
@@ -56,11 +56,11 @@ func NewReferenceAddonReconciler(client client.Client, opts ...ReferenceAddonRec
 type ReferenceAddonReconciler struct {
 	cfg ReferenceAddonReconcilerConfig
 
-	phases []phase.Phase
+	orderedPhases []phase.Phase
 }
 
 func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	for _, p := range r.phases {
+	for _, p := range r.orderedPhases {
 		if res := p.Execute(ctx, phase.Request{Object: req.NamespacedName}); res.Error() != nil {
 			return ctrl.Result{}, res.Error()
 		} else if !res.IsSuccess() {

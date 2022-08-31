@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -47,22 +48,25 @@ var (
 
 func init() {
 	// Client/Scheme setup.
-	err := clientgoscheme.AddToScheme(Scheme)
-	if err != nil {
+	if err := clientgoscheme.AddToScheme(Scheme); err != nil {
 		panic(err)
 	}
 
-	err = refapis.AddToScheme(Scheme)
-	if err != nil {
+	if err := refapis.AddToScheme(Scheme); err != nil {
 		panic(err)
 	}
 
-	err = apiextensionsv1.AddToScheme(Scheme)
-	if err != nil {
+	if err := apiextensionsv1.AddToScheme(Scheme); err != nil {
+		panic(err)
+	}
+
+	if err := opsv1alpha1.AddToScheme(Scheme); err != nil {
 		panic(err)
 	}
 
 	Config = ctrl.GetConfigOrDie()
+
+	var err error
 
 	Client, err = client.New(Config, client.Options{
 		Scheme: Scheme,

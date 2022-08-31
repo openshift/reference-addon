@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	externalURLs = []string{"https://httpstat.us/503", "https://httpstat.us/200"}
-
 	availability = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "reference_addon_sample_availability",
@@ -33,25 +31,35 @@ func RegisterMetrics() {
 	ctrlmetrics.Registry.MustRegister(responseTime)
 }
 
-func RequestSampleResponseData() {
-	for _, externalURL := range externalURLs {
-		status, timeTaken := callExternalURL(externalURL)
-		availability.WithLabelValues(externalURL).Set(status)
-		responseTime.WithLabelValues(externalURL).Set(timeTaken)
+func NewResponseSamplerImpl() *ResponseSamplerImpl {
+	return &ResponseSamplerImpl{}
+}
+
+type ResponseSamplerImpl struct{}
+
+func (r *ResponseSamplerImpl) RequestSampleResponseData(urls ...string) {
+	for _, url := range urls {
+		status, timeTaken := callExternalURL(url)
+
+		availability.WithLabelValues(url).Set(status)
+		responseTime.WithLabelValues(url).Set(timeTaken)
 	}
 }
 
 func callExternalURL(externalURL string) (float64, float64) {
 	start := time.Now()
-	response, err := http.Get(externalURL)
+
+	res, err := http.Get(externalURL)
 	if err != nil {
 		return 0, 0
 	}
-	defer response.Body.Close()
-	timeTaken := time.Since(start).Milliseconds()
+	defer res.Body.Close()
+
 	status := 0
-	if response.StatusCode == 200 {
+
+	if res.StatusCode == 200 {
 		status = 1
 	}
-	return float64(status), float64(timeTaken)
+
+	return float64(status), float64(time.Since(start).Milliseconds())
 }

@@ -34,13 +34,19 @@ func NewReferenceAddonReconciler(client client.Client, opts ...ReferenceAddonRec
 		return nil, fmt.Errorf("initializing uninstall signaler: %w", err)
 	}
 
+	phaseUninstallLog := cfg.Log.WithName("phase").WithName("uninstall")
+
 	return &ReferenceAddonReconciler{
 		cfg: cfg,
 		orderedPhases: []phase.Phase{
 			NewPhaseUninstall(
 				signaler,
-				NewUninstallerImpl(client, NewCSVListerImpl(client)),
-				WithLog{Log: cfg.Log.WithName("phase").WithName("uninstall")},
+				NewUninstallerImpl(
+					client,
+					NewCSVListerImpl(client),
+					WithLog{Log: phaseUninstallLog.WithName("uninstaller")},
+				),
+				WithLog{Log: phaseUninstallLog},
 				WithAddonNamespace(cfg.AddonNamespace),
 				WithOperatorName(cfg.OperatorName),
 			),

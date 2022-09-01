@@ -69,6 +69,7 @@ func main() {
 		LeaderElectionResourceLock: "leases",
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionID:           "8a4hp84a6s.addon-operator-lock",
+		Namespace:                  addonNamespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

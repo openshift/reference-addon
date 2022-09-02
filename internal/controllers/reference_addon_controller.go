@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,10 +16,11 @@ import (
 	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
 	"github.com/openshift/reference-addon/internal/controllers/phase"
 	"github.com/openshift/reference-addon/internal/metrics"
+	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func NewReferenceAddonReconciler(client client.Client, syncer ParameterGetter, opts ...ReferenceAddonReconcilerOption) (*ReferenceAddonReconciler, error) {
+func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, opts ...ReferenceAddonReconcilerOption) (*ReferenceAddonReconciler, error) {
 	var cfg ReferenceAddonReconcilerConfig
 
 	cfg.Option(opts...)
@@ -37,8 +39,8 @@ func NewReferenceAddonReconciler(client client.Client, syncer ParameterGetter, o
 	phaseUninstallLog := cfg.Log.WithName("phase").WithName("uninstall")
 
 	return &ReferenceAddonReconciler{
-		cfg:    cfg,
-		syncer: syncer,
+		cfg:         cfg,
+		paramGetter: getter,
 		orderedPhases: []phase.Phase{
 			NewPhaseUninstall(
 				signaler,
@@ -65,13 +67,13 @@ func NewReferenceAddonReconciler(client client.Client, syncer ParameterGetter, o
 type ReferenceAddonReconciler struct {
 	cfg ReferenceAddonReconcilerConfig
 
-	syncer ParameterGetter
+	paramGetter ParameterGetter
 
 	orderedPhases []phase.Phase
 }
 
 func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	params, err := r.syncer.GetParameters(ctx)
+	params, err := r.paramGetter.GetParameters(ctx)
 	if err != nil {
 		// Log error and continue reconcilliation so subsequent phases
 		// can fail if required parameters are missing.
@@ -97,31 +99,40 @@ func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	configMapPredicates := predicate.NewPredicateFuncs(
-		func(obj client.Object) bool {
-			return obj.GetName() == r.cfg.OperatorName
-		},
-	)
-
-	secretPredicates := predicate.NewPredicateFuncs(
-		func(obj client.Object) bool {
-			return obj.GetName() == r.cfg.AddonParameterSecretname
-		},
-	)
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&refapisv1alpha1.ReferenceAddon{}).
 		Watches(
+			&source.Kind{Type: &opsv1alpha1.ClusterServiceVersion{}},
+			&handler.EnqueueRequestForObject{},
+			builder.WithPredicates(hasNamePrefix(r.cfg.OperatorName)),
+		).
+		Watches(
 			&source.Kind{Type: &corev1.ConfigMap{}},
 			&handler.EnqueueRequestForObject{},
-			builder.WithPredicates(configMapPredicates),
+			builder.WithPredicates(hasName(r.cfg.OperatorName)),
 		).
 		Watches(
 			&source.Kind{Type: &corev1.Secret{}},
 			&handler.EnqueueRequestForObject{},
-			builder.WithPredicates(secretPredicates),
+			builder.WithPredicates(hasName(r.cfg.AddonParameterSecretname)),
 		).
 		Complete(r)
+}
+
+func hasNamePrefix(pfx string) predicate.Funcs {
+	return predicate.NewPredicateFuncs(
+		func(obj client.Object) bool {
+			return strings.HasPrefix(obj.GetName(), pfx)
+		},
+	)
+}
+
+func hasName(name string) predicate.Funcs {
+	return predicate.NewPredicateFuncs(
+		func(obj client.Object) bool {
+			return obj.GetName() == name
+		},
+	)
 }
 
 type ReferenceAddonReconcilerConfig struct {

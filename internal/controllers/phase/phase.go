@@ -12,6 +12,11 @@ type Phase interface {
 
 type Request struct {
 	Object types.NamespacedName
+	Params RequestParameters
+}
+
+type RequestParameters struct {
+	Size string
 }
 
 func Success() Result {

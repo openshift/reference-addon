@@ -36,9 +36,10 @@ func init() {
 }
 
 const (
-	addonNamespace = "redhat-reference-addon"
-	operatorName   = "reference-addon"
-	deleteLabel    = "api.openshift.com/addon-reference-addon-delete"
+	addonNamespace           = "redhat-reference-addon"
+	operatorName             = "reference-addon"
+	deleteLabel              = "api.openshift.com/addon-reference-addon-delete"
+	addonParameterSecretname = "addon-reference-addon-parameters"
 )
 
 func main() {
@@ -121,11 +122,20 @@ func main() {
 		setupLog.Error(fmt.Errorf("unable to set up ready check: %w", err), "setting up manager")
 		os.Exit(1)
 	}
+
+	client := mgr.GetClient()
+
 	// the following section hooks up a heartbeat reporter with the current addon/operator
 	r, err := controllers.NewReferenceAddonReconciler(
-		mgr.GetClient(),
+		client,
+		controllers.NewSecretParameterGetter(
+			client,
+			controllers.WithNamespace(addonNamespace),
+			controllers.WithName(addonParameterSecretname),
+		),
 		controllers.WithLog{Log: ctrl.Log.WithName("controllers").WithName("ReferenceAddon")},
 		controllers.WithAddonNamespace(addonNamespace),
+		controllers.WithAddonParameterSecretName(addonParameterSecretname),
 		controllers.WithOperatorName(operatorName),
 		controllers.WithDeleteLabel(deleteLabel),
 	)

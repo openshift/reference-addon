@@ -18,7 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func NewReferenceAddonReconciler(client client.Client, opts ...ReferenceAddonReconcilerOption) (*ReferenceAddonReconciler, error) {
+func NewReferenceAddonReconciler(client client.Client, syncer ParameterGetter, opts ...ReferenceAddonReconcilerOption) (*ReferenceAddonReconciler, error) {
 	var cfg ReferenceAddonReconcilerConfig
 
 	cfg.Option(opts...)
@@ -37,7 +37,8 @@ func NewReferenceAddonReconciler(client client.Client, opts ...ReferenceAddonRec
 	phaseUninstallLog := cfg.Log.WithName("phase").WithName("uninstall")
 
 	return &ReferenceAddonReconciler{
-		cfg: cfg,
+		cfg:    cfg,
+		syncer: syncer,
 		orderedPhases: []phase.Phase{
 			NewPhaseUninstall(
 				signaler,
@@ -64,12 +65,26 @@ func NewReferenceAddonReconciler(client client.Client, opts ...ReferenceAddonRec
 type ReferenceAddonReconciler struct {
 	cfg ReferenceAddonReconcilerConfig
 
+	syncer ParameterGetter
+
 	orderedPhases []phase.Phase
 }
 
 func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	params, err := r.syncer.GetParameters(ctx)
+	if err != nil {
+		// Log error and continue reconcilliation so subsequent phases
+		// can fail if required parameters are missing.
+		r.cfg.Log.Error(err, "unable to sync addon parameters")
+	}
+
+	phaseReq := phase.Request{
+		Object: req.NamespacedName,
+		Params: params,
+	}
+
 	for _, p := range r.orderedPhases {
-		if res := p.Execute(ctx, phase.Request{Object: req.NamespacedName}); res.Error() != nil {
+		if res := p.Execute(ctx, phaseReq); res.Error() != nil {
 			return ctrl.Result{}, res.Error()
 		} else if !res.IsSuccess() {
 			return ctrl.Result{Requeue: true}, nil
@@ -88,6 +103,12 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		},
 	)
 
+	secretPredicates := predicate.NewPredicateFuncs(
+		func(obj client.Object) bool {
+			return obj.GetName() == r.cfg.AddonParameterSecretname
+		},
+	)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&refapisv1alpha1.ReferenceAddon{}).
 		Watches(
@@ -95,15 +116,21 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&handler.EnqueueRequestForObject{},
 			builder.WithPredicates(configMapPredicates),
 		).
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			&handler.EnqueueRequestForObject{},
+			builder.WithPredicates(secretPredicates),
+		).
 		Complete(r)
 }
 
 type ReferenceAddonReconcilerConfig struct {
 	Log logr.Logger
 
-	AddonNamespace string
-	OperatorName   string
-	DeleteLabel    string
+	AddonNamespace           string
+	AddonParameterSecretname string
+	OperatorName             string
+	DeleteLabel              string
 }
 
 func (c *ReferenceAddonReconcilerConfig) Option(opts ...ReferenceAddonReconcilerOption) {

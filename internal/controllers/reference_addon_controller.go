@@ -8,7 +8,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
 	"github.com/openshift/reference-addon/internal/controllers/phase"
@@ -32,13 +34,19 @@ func NewReferenceAddonReconciler(client client.Client, opts ...ReferenceAddonRec
 		return nil, fmt.Errorf("initializing uninstall signaler: %w", err)
 	}
 
+	phaseUninstallLog := cfg.Log.WithName("phase").WithName("uninstall")
+
 	return &ReferenceAddonReconciler{
 		cfg: cfg,
 		orderedPhases: []phase.Phase{
 			NewPhaseUninstall(
 				signaler,
-				NewUninstallerImpl(client, NewCSVListerImpl(client)),
-				WithLog{Log: cfg.Log.WithName("phase").WithName("uninstall")},
+				NewUninstallerImpl(
+					client,
+					NewCSVListerImpl(client),
+					WithLog{Log: phaseUninstallLog.WithName("uninstaller")},
+				),
+				WithLog{Log: phaseUninstallLog},
 				WithAddonNamespace(cfg.AddonNamespace),
 				WithOperatorName(cfg.OperatorName),
 			),
@@ -82,7 +90,11 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&refapisv1alpha1.ReferenceAddon{}).
-		For(&corev1.ConfigMap{}, builder.WithPredicates(configMapPredicates)).
+		Watches(
+			&source.Kind{Type: &corev1.ConfigMap{}},
+			&handler.EnqueueRequestForObject{},
+			builder.WithPredicates(configMapPredicates),
+		).
 		Complete(r)
 }
 

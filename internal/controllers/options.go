@@ -16,6 +16,10 @@ func (w WithLog) ConfigurePhaseUninstall(c *PhaseUninstallConfig) {
 	c.Log = w.Log
 }
 
+func (w WithLog) ConfigureUninstallerImpl(c *UninstallerImplConfig) {
+	c.Log = w.Log
+}
+
 type WithAddonNamespace string
 
 func (w WithAddonNamespace) ConfigureConfigMapUninstallSignaler(c *ConfigMapUninstallSignalerConfig) {

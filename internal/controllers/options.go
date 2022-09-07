@@ -34,6 +34,12 @@ func (w WithAddonNamespace) ConfigurePhaseUninstall(c *PhaseUninstallConfig) {
 	c.AddonNamespace = string(w)
 }
 
+type WithAddonParameterSecretName string
+
+func (w WithAddonParameterSecretName) ConfigureReferenceAddonReconciler(c *ReferenceAddonReconcilerConfig) {
+	c.AddonParameterSecretname = string(w)
+}
+
 type WithOperatorName string
 
 func (w WithOperatorName) ConfigureConfigMapUninstallSignaler(c *ConfigMapUninstallSignalerConfig) {
@@ -58,7 +64,17 @@ func (w WithDeleteLabel) ConfigureReferenceAddonReconciler(c *ReferenceAddonReco
 	c.DeleteLabel = string(w)
 }
 
+type WithName string
+
+func (w WithName) ConfigureSecretParameterGetter(c *SecretParameterGetterConfig) {
+	c.Name = string(w)
+}
+
 type WithNamespace string
+
+func (w WithNamespace) ConfigureSecretParameterGetter(c *SecretParameterGetterConfig) {
+	c.Namespace = string(w)
+}
 
 func (w WithNamespace) ConfigureListCSVs(c *ListCSVsConfig) {
 	c.Namespace = string(w)

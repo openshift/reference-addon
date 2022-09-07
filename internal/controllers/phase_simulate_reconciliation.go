@@ -26,6 +26,11 @@ type PhaseSimulateReconciliation struct {
 func (p *PhaseSimulateReconciliation) Execute(ctx context.Context, req phase.Request) phase.Result {
 	log := p.cfg.Log.WithValues("addon", req.Object.String())
 
+	log.Info(
+		"reconciling with addon parameters",
+		"Size", req.Params.Size,
+	)
+
 	// dummy code to indicate reconciliation of the reference-addon object
 	if strings.HasPrefix(req.Object.Name, "redhat-") {
 		log.Info("reconciling for a reference addon object prefixed by redhat- ")

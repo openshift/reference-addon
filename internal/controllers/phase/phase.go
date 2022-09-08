@@ -15,8 +15,63 @@ type Request struct {
 	Params RequestParameters
 }
 
+func NewRequestParameters(opts ...RequestParametersOption) RequestParameters {
+	var cfg RequestParametersConfig
+
+	cfg.Option(opts...)
+
+	return RequestParameters{
+		applyNetworkPolicies: cfg.ApplyNetworkPolicies,
+		size:                 cfg.Size,
+	}
+}
+
 type RequestParameters struct {
-	Size string
+	applyNetworkPolicies *bool
+	size                 *string
+}
+
+func (p *RequestParameters) GetSize() (string, bool) {
+	if p.size == nil {
+		return "", false
+	}
+
+	return *p.size, true
+}
+
+func (p *RequestParameters) GetApplyNetworkPolicies() (bool, bool) {
+	if p.applyNetworkPolicies == nil {
+		return false, false
+	}
+
+	return *p.applyNetworkPolicies, true
+}
+
+type RequestParametersConfig struct {
+	ApplyNetworkPolicies *bool
+	Size                 *string
+}
+
+func (c *RequestParametersConfig) Option(opts ...RequestParametersOption) {
+	for _, opt := range opts {
+		opt.ConfigureRequestParameters(c)
+	}
+}
+
+type WithApplyNetworkPolicies struct{ Value *bool }
+
+func (w WithApplyNetworkPolicies) ConfigureRequestParameters(c *RequestParametersConfig) {
+	c.ApplyNetworkPolicies = w.Value
+}
+
+type WithSize struct{ Value *string }
+
+func (w WithSize) ConfigureRequestParameters(c *RequestParametersConfig) {
+	c.Size = w.Value
+}
+
+type RequestParametersOption interface {
+	ConfigureRequestParameters(*RequestParametersConfig)
 }
 
 func Success() Result {

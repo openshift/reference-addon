@@ -18,6 +18,8 @@ import (
 	"github.com/openshift/reference-addon/internal/metrics"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, opts ...ReferenceAddonReconcilerOption) (*ReferenceAddonReconciler, error) {
@@ -36,7 +38,12 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 		return nil, fmt.Errorf("initializing uninstall signaler: %w", err)
 	}
 
-	phaseUninstallLog := cfg.Log.WithName("phase").WithName("uninstall")
+	var (
+		phaseLog                       = cfg.Log.WithName("phase")
+		phaseApplyNetworkPoliciesLog   = phaseLog.WithName("applyNetworkPolicies")
+		phaseSimulateReconciliationLog = phaseLog.WithName("simulateReconciliation")
+		phaseUninstallLog              = phaseLog.WithName("uninstall")
+	)
 
 	return &ReferenceAddonReconciler{
 		cfg:         cfg,
@@ -54,11 +61,29 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 				WithOperatorName(cfg.OperatorName),
 			),
 			NewPhaseSimulateReconciliation(
-				WithLog{Log: cfg.Log.WithName("phase").WithName("simulate-reconciliation")},
+				WithLog{Log: phaseSimulateReconciliationLog},
 			),
 			NewPhaseSendDummyMetrics(
 				metrics.NewResponseSamplerImpl(),
 				WithSampleURLs{"https://httpstat.us/503", "https://httpstat.us/200"},
+			),
+			NewPhaseApplyNetworkPolicies(
+				NewNetworkPolicyClientImpl(client),
+				WithLog{Log: phaseApplyNetworkPoliciesLog},
+				WithPolicies{
+					netv1.NetworkPolicy{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      generateIngressPolicyName(cfg.OperatorName),
+							Namespace: cfg.AddonNamespace,
+						},
+						Spec: netv1.NetworkPolicySpec{
+							PodSelector: metav1.LabelSelector{},
+							PolicyTypes: []netv1.PolicyType{
+								netv1.PolicyTypeIngress,
+							},
+						},
+					},
+				},
 			),
 		},
 	}, nil
@@ -115,6 +140,11 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Secret{}},
 			&handler.EnqueueRequestForObject{},
 			builder.WithPredicates(hasName(r.cfg.AddonParameterSecretname)),
+		).
+		Watches(
+			&source.Kind{Type: &netv1.NetworkPolicy{}},
+			&handler.EnqueueRequestForObject{},
+			builder.WithPredicates(hasName(generateIngressPolicyName(r.cfg.OperatorName))),
 		).
 		Complete(r)
 }

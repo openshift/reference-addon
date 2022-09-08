@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -277,16 +276,6 @@ func (c *ConfigMapUninstallSignalerConfig) Validate() error {
 	}
 
 	return finalErr
-}
-
-var ErrEmptyOptionValue = errors.New("empty option value")
-
-func validateOptionValue(val string) error {
-	if val != "" {
-		return nil
-	}
-
-	return ErrEmptyOptionValue
 }
 
 type ConfigMapUninstallSignalerOption interface {

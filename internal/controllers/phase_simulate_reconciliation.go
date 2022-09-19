@@ -26,9 +26,13 @@ type PhaseSimulateReconciliation struct {
 func (p *PhaseSimulateReconciliation) Execute(ctx context.Context, req phase.Request) phase.Result {
 	log := p.cfg.Log.WithValues("addon", req.Object.String())
 
+	applyNetworkPolicies, _ := req.Params.GetApplyNetworkPolicies()
+	size, _ := req.Params.GetSize()
+
 	log.Info(
 		"reconciling with addon parameters",
-		"Size", req.Params.Size,
+		"ApplyNetworkPolicies", applyNetworkPolicies,
+		"Size", size,
 	)
 
 	// dummy code to indicate reconciliation of the reference-addon object

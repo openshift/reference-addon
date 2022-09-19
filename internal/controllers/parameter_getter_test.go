@@ -34,14 +34,16 @@ func TestSecretParameterGetter(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Data: map[string][]byte{
-					"size": []byte("1"),
+					"applynetworkpolicies": []byte("true"),
+					"size":                 []byte("1"),
 				},
 			},
 			Namespace: "test-namespace",
 			Name:      "test",
-			ExpectedParams: phase.RequestParameters{
-				Size: "1",
-			},
+			ExpectedParams: phase.NewRequestParameters(
+				phase.WithApplyNetworkPolicies{Value: boolPtr(true)},
+				phase.WithSize{Value: stringPtr("1")},
+			),
 		},
 	} {
 		tc := tc

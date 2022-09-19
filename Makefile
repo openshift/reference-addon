@@ -9,6 +9,7 @@ GOIMPORTS_VERSION:=v0.1.0
 GOLANGCI_LINT_VERSION:=v1.39.0
 OLM_VERSION:=v0.17.0
 OPM_VERSION:=v1.17.2
+SETUP_ENVTEST_VERSION:=latest
 
 # Build Flags
 export CGO_ENABLED:=0
@@ -77,7 +78,7 @@ $(KIND):
 	$(eval KIND_TMP := $(shell mktemp -d))
 	@(cd "$(KIND_TMP)" \
 		&& go mod init tmp \
-		&& go get "sigs.k8s.io/kind@$(KIND_VERSION)" \
+		&& go install "sigs.k8s.io/kind@$(KIND_VERSION)" \
 	) 2>&1 | sed 's/^/  /'
 	@rm -rf "$(KIND_TMP)" "$(dir $(KIND))" \
 		&& mkdir -p "$(dir $(KIND))" \
@@ -91,7 +92,7 @@ $(CONTROLLER_GEN):
 	$(eval CONTROLLER_GEN_TMP := $(shell mktemp -d))
 	@(cd "$(CONTROLLER_GEN_TMP)" \
 		&& go mod init tmp \
-		&& go get "sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION)" \
+		&& go install "sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION)" \
 	) 2>&1 | sed 's/^/  /'
 	@rm -rf "$(CONTROLLER_GEN_TMP)" "$(dir $(CONTROLLER_GEN))" \
 		&& mkdir -p "$(dir $(CONTROLLER_GEN))" \
@@ -105,7 +106,7 @@ $(YQ):
 	$(eval YQ_TMP := $(shell mktemp -d))
 	@(cd "$(YQ_TMP)" \
 		&& go mod init tmp \
-		&& go get "github.com/mikefarah/yq/$(YQ_VERSION)" \
+		&& go install "github.com/mikefarah/yq/$(YQ_VERSION)" \
 	) 2>&1 | sed 's/^/  /'
 	@rm -rf "$(YQ_TMP)" "$(dir $(YQ))" \
 		&& mkdir -p "$(dir $(YQ))" \
@@ -119,7 +120,7 @@ $(GOIMPORTS):
 	$(eval GOIMPORTS_TMP := $(shell mktemp -d))
 	@(cd "$(GOIMPORTS_TMP)" \
 		&& go mod init tmp \
-		&& go get "golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)" \
+		&& go install "golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)" \
 	) 2>&1 | sed 's/^/  /'
 	@rm -rf "$(GOIMPORTS_TMP)" "$(dir $(GOIMPORTS))" \
 		&& mkdir -p "$(dir $(GOIMPORTS))" \
@@ -135,7 +136,7 @@ $(GOLANGCI_LINT):
 	$(eval GOLANGCI_LINT_TMP := $(shell mktemp -d))
 	@(cd "$(GOLANGCI_LINT_TMP)" \
 		&& go mod init tmp \
-		&& go get "github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)" \
+		&& go install "github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)" \
 	) 2>&1 | sed 's/^/  /'
 	@rm -rf "$(GOLANGCI_LINT_TMP)" "$(dir $(GOLANGCI_LINT))" \
 		&& mkdir -p "$(dir $(GOLANGCI_LINT))" \
@@ -157,13 +158,27 @@ $(OPM):
 		&& touch "$(OPM)" \
 		&& echo
 
+SETUP_ENVTEST:=$(DEPENDENCIES)/setup-envtest/$(SETUP_ENVTEST_VERSION)
+$(SETUP_ENVTEST):
+	@echo "installing setup-envtest $(SETUP_ENVTEST_VERSION)..."
+	$(eval SETUP_ENVTEST_TMP := $(shell mktemp -d))
+	@(cd "$(SETUP_ENVTEST_TMP)" \
+		&& go mod init tmp \
+		&& go install "sigs.k8s.io/controller-runtime/tools/setup-envtest@$(SETUP_ENVTEST_VERSION)" \
+	) 2>&1 | sed 's/^/  /'
+	@rm -rf "$(SETUP_ENVTEST_TMP)" "$(dir $(SETUP_ENVTEST))" \
+		&& mkdir -p "$(dir $(SETUP_ENVTEST))" \
+		&& touch "$(SETUP_ENVTEST)" \
+		&& echo
+
 # installs all project dependencies
 dependencies: \
 	$(KIND) \
 	$(CONTROLLER_GEN) \
 	$(YQ) \
 	$(GOIMPORTS) \
-	$(GOLANGCI_LINT)
+	$(GOLANGCI_LINT) \
+	$(SETUP_ENVTEST)
 .PHONY: dependencies
 
 # ----------
@@ -208,6 +223,13 @@ lint: generate $(GOLANGCI_LINT)
 test-unit: generate
 	CGO_ENABLED=1 go test -race -v ./internal/... ./cmd/...
 .PHONY: test-unit
+
+# Runs integration tests
+test-integration: $(SETUP_ENVTEST)
+	$(eval ASSET_PATH := $(shell setup-envtest use -p path --bin-dir=$(GOBIN) 1.20.x!))
+
+	KUBEBUILDER_ASSETS=$(ASSET_PATH) go test -v ./integration/...
+.PHONY: test-integration
 
 # Runs the E2E testsuite against the currently selected cluster.
 # FORCE_FLAGS ensures that the tests will not be cached

@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/openshift/reference-addon/internal/controllers/phase"
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +34,8 @@ type SecretParameterGetter struct {
 }
 
 const (
-	sizeParameterID = "size"
+	applyNetworkPoliciesID = "applynetworkpolicies"
+	sizeParameterID        = "size"
 )
 
 func (s *SecretParameterGetter) GetParameters(ctx context.Context) (phase.RequestParameters, error) {
@@ -44,19 +47,30 @@ func (s *SecretParameterGetter) GetParameters(ctx context.Context) (phase.Reques
 		Name:      s.cfg.Name,
 	}
 
-	var params phase.RequestParameters
-
 	var secret corev1.Secret
 
 	if err := s.client.Get(ctx, key, &secret); err != nil {
-		return params, fmt.Errorf("retrieving addon parameters secret: %w", err)
+		return phase.NewRequestParameters(), fmt.Errorf("retrieving addon parameters secret: %w", err)
+	}
+
+	var opts []phase.RequestParametersOption
+
+	if val, ok := secret.Data[applyNetworkPoliciesID]; ok {
+		b, err := parseBool(string(val))
+		if err != nil {
+			return phase.NewRequestParameters(), fmt.Errorf("parsing 'ApplyNetworkPolicies' value: %w", err)
+		}
+
+		opts = append(opts, phase.WithApplyNetworkPolicies{Value: &b})
 	}
 
 	if val, ok := secret.Data[sizeParameterID]; ok {
-		params.Size = string(val)
+		s := string(val)
+
+		opts = append(opts, phase.WithSize{Value: &s})
 	}
 
-	return params, nil
+	return phase.NewRequestParameters(opts...), nil
 }
 
 type SecretParameterGetterConfig struct {
@@ -72,4 +86,17 @@ func (c *SecretParameterGetterConfig) Option(opts ...SecretParameteterGetterOpti
 
 type SecretParameteterGetterOption interface {
 	ConfigureSecretParameterGetter(*SecretParameterGetterConfig)
+}
+
+var ErrInvalidBoolValue = errors.New("invalid bool value")
+
+func parseBool(maybeBool string) (bool, error) {
+	switch strings.ToLower(maybeBool) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, ErrInvalidBoolValue
+	}
 }

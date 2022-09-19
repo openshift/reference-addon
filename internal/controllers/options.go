@@ -1,10 +1,17 @@
 package controllers
 
-import "github.com/go-logr/logr"
+import (
+	"github.com/go-logr/logr"
+	netv1 "k8s.io/api/networking/v1"
+)
 
 type WithLog struct{ Log logr.Logger }
 
 func (w WithLog) ConfigureReferenceAddonReconciler(c *ReferenceAddonReconcilerConfig) {
+	c.Log = w.Log
+}
+
+func (w WithLog) ConfigurePhaseApplyNetworkPolicies(c *PhaseApplyNetworkPoliciesConfig) {
 	c.Log = w.Log
 }
 
@@ -78,6 +85,12 @@ func (w WithNamespace) ConfigureSecretParameterGetter(c *SecretParameterGetterCo
 
 func (w WithNamespace) ConfigureListCSVs(c *ListCSVsConfig) {
 	c.Namespace = string(w)
+}
+
+type WithPolicies []netv1.NetworkPolicy
+
+func (w WithPolicies) ConfigurePhaseApplyNetworkPolicies(c *PhaseApplyNetworkPoliciesConfig) {
+	c.Policies = []netv1.NetworkPolicy(w)
 }
 
 type WithPrefix string

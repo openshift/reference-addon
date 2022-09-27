@@ -10,6 +10,7 @@ import (
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -77,7 +78,7 @@ type Uninstaller interface {
 	Uninstall(ctx context.Context, namespace, operatorName string) error
 }
 
-func NewUninstallerImpl(client client.Client, lister CSVLister, opts ...UninstallerImplOption) *UninstallerImpl {
+func NewUninstallerImpl(client CSVClient, opts ...UninstallerImplOption) *UninstallerImpl {
 	var cfg UninstallerImplConfig
 
 	cfg.Option(opts...)
@@ -87,43 +88,29 @@ func NewUninstallerImpl(client client.Client, lister CSVLister, opts ...Uninstal
 		cfg: cfg,
 
 		client: client,
-		lister: lister,
 	}
 }
 
 type UninstallerImpl struct {
 	cfg UninstallerImplConfig
 
-	client client.Client
-	lister CSVLister
+	client CSVClient
 }
 
 func (u UninstallerImpl) Uninstall(ctx context.Context, namespace, operatorName string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	csvs, err := u.lister.ListCSVs(ctx, WithNamespace(namespace), WithPrefix(operatorName))
+	csvs, err := u.client.ListCSVs(ctx, WithNamespace(namespace), WithPrefix(operatorName))
 	if err != nil {
 		return fmt.Errorf("listing ClusterServiceVersions with name %q: %w", operatorName, err)
 	}
 
-	var finalErr error
-
-	for _, csv := range csvs {
-		log := u.cfg.Log.WithValues("csv", csv.Name)
-
-		log.Info("attempting to delete 'ClusterServiceVersion'")
-
-		if err := u.client.Delete(ctx, &csv); err != nil {
-			log.Error(err, "failed to delete 'ClusterServiceVersion'")
-
-			multierr.AppendInto(&finalErr, fmt.Errorf("deleting CSV %q: %w", csv.Name, err))
-		} else {
-			log.Info("successfully deleted 'ClusterServiceVersion'")
-		}
+	if err := u.client.RemoveCSVs(ctx, csvs...); err != nil {
+		return fmt.Errorf("removing csvs: %w", err)
 	}
 
-	return finalErr
+	return nil
 }
 
 type UninstallerImplConfig struct {
@@ -146,8 +133,9 @@ type UninstallerImplOption interface {
 	ConfigureUninstallerImpl(*UninstallerImplConfig)
 }
 
-type CSVLister interface {
+type CSVClient interface {
 	ListCSVs(ctx context.Context, opts ...ListCSVsOption) ([]opsv1alpha1.ClusterServiceVersion, error)
+	RemoveCSVs(ctx context.Context, csvs ...opsv1alpha1.ClusterServiceVersion) error
 }
 
 type ListCSVsConfig struct {
@@ -165,17 +153,26 @@ type ListCSVsOption interface {
 	ConfigureListCSVs(*ListCSVsConfig)
 }
 
-func NewCSVListerImpl(client client.Client) *CSVListerImpl {
-	return &CSVListerImpl{
+func NewCSVClientImpl(client client.Client, opts ...CSVClientOption) *CSVClientImpl {
+	var cfg CSVClientImplConfig
+
+	cfg.Option(opts...)
+	cfg.Default()
+
+	return &CSVClientImpl{
+		cfg: cfg,
+
 		client: client,
 	}
 }
 
-type CSVListerImpl struct {
+type CSVClientImpl struct {
+	cfg CSVClientImplConfig
+
 	client client.Client
 }
 
-func (l *CSVListerImpl) ListCSVs(ctx context.Context, opts ...ListCSVsOption) ([]opsv1alpha1.ClusterServiceVersion, error) {
+func (c *CSVClientImpl) ListCSVs(ctx context.Context, opts ...ListCSVsOption) ([]opsv1alpha1.ClusterServiceVersion, error) {
 	var cfg ListCSVsConfig
 
 	cfg.Option(opts...)
@@ -188,7 +185,7 @@ func (l *CSVListerImpl) ListCSVs(ctx context.Context, opts ...ListCSVsOption) ([
 
 	var csvs opsv1alpha1.ClusterServiceVersionList
 
-	if err := l.client.List(ctx, &csvs, listOptions...); err != nil {
+	if err := c.client.List(ctx, &csvs, listOptions...); err != nil {
 		return nil, fmt.Errorf("listing ClusterServiceVersions: %w", err)
 	}
 
@@ -203,6 +200,44 @@ func (l *CSVListerImpl) ListCSVs(ctx context.Context, opts ...ListCSVsOption) ([
 	}
 
 	return res, nil
+}
+
+func (c *CSVClientImpl) RemoveCSVs(ctx context.Context, csvs ...opsv1alpha1.ClusterServiceVersion) error {
+	var finalErr error
+
+	for _, csv := range csvs {
+		c.cfg.Log.Info("attempting to delete 'ClusterServiceVersion'")
+
+		if err := c.client.Delete(ctx, &csv); err != nil && !errors.IsNotFound(err) {
+			c.cfg.Log.Error(err, "failed to delete 'ClusterServiceVersion'")
+
+			multierr.AppendInto(&finalErr, fmt.Errorf("deleting CSV %q: %w", csv.Name, err))
+		} else {
+			c.cfg.Log.Info("successfully deleted 'ClusterServiceVersion'")
+		}
+	}
+
+	return finalErr
+}
+
+type CSVClientImplConfig struct {
+	Log logr.Logger
+}
+
+func (c *CSVClientImplConfig) Option(opts ...CSVClientOption) {
+	for _, opt := range opts {
+		opt.ConfigureCSVClientImpl(c)
+	}
+}
+
+func (c *CSVClientImplConfig) Default() {
+	if c.Log == nil {
+		c.Log = logr.Discard()
+	}
+}
+
+type CSVClientOption interface {
+	ConfigureCSVClientImpl(*CSVClientImplConfig)
 }
 
 type UninstallSignaler interface {

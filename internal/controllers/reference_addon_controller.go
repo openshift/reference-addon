@@ -43,6 +43,7 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 		phaseApplyNetworkPoliciesLog   = phaseLog.WithName("applyNetworkPolicies")
 		phaseSimulateReconciliationLog = phaseLog.WithName("simulateReconciliation")
 		phaseUninstallLog              = phaseLog.WithName("uninstall")
+		uninstallerLog                 = phaseUninstallLog.WithName("uninstaller")
 	)
 
 	return &ReferenceAddonReconciler{
@@ -52,9 +53,11 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 			NewPhaseUninstall(
 				signaler,
 				NewUninstallerImpl(
-					client,
-					NewCSVListerImpl(client),
-					WithLog{Log: phaseUninstallLog.WithName("uninstaller")},
+					NewCSVClientImpl(
+						client,
+						WithLog{Log: uninstallerLog.WithName("client")},
+					),
+					WithLog{Log: uninstallerLog},
 				),
 				WithLog{Log: phaseUninstallLog},
 				WithAddonNamespace(cfg.AddonNamespace),

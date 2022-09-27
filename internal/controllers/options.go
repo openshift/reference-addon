@@ -27,6 +27,10 @@ func (w WithLog) ConfigureUninstallerImpl(c *UninstallerImplConfig) {
 	c.Log = w.Log
 }
 
+func (w WithLog) ConfigureCSVClientImpl(c *CSVClientImplConfig) {
+	c.Log = w.Log
+}
+
 type WithAddonNamespace string
 
 func (w WithAddonNamespace) ConfigureConfigMapUninstallSignaler(c *ConfigMapUninstallSignalerConfig) {

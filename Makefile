@@ -228,7 +228,7 @@ test-unit: generate
 test-integration: $(SETUP_ENVTEST)
 	$(eval ASSET_PATH := $(shell setup-envtest use -p path --bin-dir=$(GOBIN) 1.20.x!))
 
-	KUBEBUILDER_ASSETS=$(ASSET_PATH) go test -v ./integration/...
+	KUBEBUILDER_ASSETS=$(ASSET_PATH) go test -v -count=1 ./integration/...
 .PHONY: test-integration
 
 # Runs the E2E testsuite against the currently selected cluster.

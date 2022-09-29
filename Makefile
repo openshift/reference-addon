@@ -53,7 +53,7 @@ bin/linux_amd64/%: GOARGS = GOOS=linux GOARCH=amd64
 bin/%: generate FORCE
 	$(eval COMPONENT=$(shell basename $*))
 	@echo -e -n "compiling cmd/$(COMPONENT)...\n  "
-	$(GOARGS) go build -ldflags "-w $(LD_FLAGS)" -o bin/$* cmd/$(COMPONENT)/main.go
+	$(GOARGS) go build -ldflags "-w $(LD_FLAGS)" -o bin/$* ./cmd/$(COMPONENT)
 	@echo
 
 FORCE:
@@ -188,7 +188,7 @@ dependencies: \
 # Run against the configured Kubernetes cluster in ~/.kube/config or $KUBECONFIG
 run: generate
 	go run -ldflags "-w $(LD_FLAGS)" \
-		./cmd/reference-addon-manager/main.go \
+		./cmd/reference-addon-manager \
 			-pprof-addr="127.0.0.1:8065"
 .PHONY: run
 

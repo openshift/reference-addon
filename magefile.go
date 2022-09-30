@@ -159,10 +159,7 @@ func (Check) Lint(ctx context.Context) error {
 	)
 
 	run := golangci(
-		command.WithArgs{
-			"run", "-v", "--fix",
-			"-E", "errcheck,gofmt,goimports,gosimple,govet,ineffassign,staticcheck,typecheck,unused",
-		},
+		command.WithArgs{"run", "-v", "--fix"},
 		command.WithContext{Context: ctx},
 	)
 
@@ -302,12 +299,14 @@ func (Test) Integration(ctx context.Context) error {
 			"--fail-on-pending",
 			"--keep-going",
 			"--trace",
+			"--no-color",
 			"-v",
 			"integration",
 		},
 		command.WithCurrentEnv(true),
 		command.WithEnv{
 			"KUBEBUILDER_ASSETS": setup.Stdout(),
+			"XDG_CACHE_HOME": filepath.Join(_projectRoot, ".cache"),
 		},
 		command.WithConsoleOut(mg.Verbose()),
 		command.WithContext{Context: ctx},

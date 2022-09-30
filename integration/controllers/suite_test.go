@@ -1,7 +1,14 @@
 package controllers
 
 import (
-	"context"
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	refapis "github.com/openshift/reference-addon/apis"
@@ -10,76 +17,138 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gexec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 var (
-	_cfg     *rest.Config
-	_client  client.Client
-	_testEnv *envtest.Environment
-	_ctx     context.Context
-	_cancel  context.CancelFunc
-	_scheme  = runtime.NewScheme()
+	_binPath        string
+	_client         *TestClient
+	_kubeConfigPath string
 )
 
+// To run these tests with an external cluster
+// set the following environment variables:
+// USE_EXISTING_CLUSTER=true
+// KUBECONFIG=<path_to_kube.config>.
+// The external cluster must have authentication
+// enabled on the API server.
 func TestSuite(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "controllers suite")
 }
 
 var _ = BeforeSuite(func() {
-	_ctx, _cancel = context.WithCancel(context.Background())
-
 	By("Registering schemes")
 
-	Expect(clientgoscheme.AddToScheme(_scheme)).Should(Succeed())
-	Expect(opsv1alpha1.AddToScheme(_scheme)).Should(Succeed())
-	Expect(refapis.AddToScheme(_scheme)).Should(Succeed())
+	scheme := runtime.NewScheme()
+	Expect(clientgoscheme.AddToScheme(scheme)).Should(Succeed())
+	Expect(opsv1alpha1.AddToScheme(scheme)).Should(Succeed())
+	Expect(refapis.AddToScheme(scheme)).Should(Succeed())
 
 	By("Starting test environment")
 
-	_testEnv = &envtest.Environment{
-		Scheme: _scheme,
+	testEnv := &envtest.Environment{
+		Scheme: scheme,
 	}
 
-	var err error
-
-	_cfg, err = _testEnv.Start()
+	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
-	Expect(_cfg).ToNot(BeNil())
+	Expect(cfg).ToNot(BeNil())
 
-	DeferCleanup(cleanup)
+	DeferCleanup(cleanup(testEnv))
 
 	By("Installing CRD's")
 
-	_, err = envtest.InstallCRDs(_cfg, envtest.CRDInstallOptions{
+	_, err = envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
 		CRDs: []v1.CustomResourceDefinition{
 			*olmcrds.ClusterServiceVersion(),
 		},
 		Paths: []string{
 			"../../config/deploy/reference.addons.managed.openshift.io_referenceaddons.yaml",
 		},
-		Scheme: _scheme,
+		Scheme: scheme,
 	})
 	Expect(err).ToNot(HaveOccurred())
 
 	By("Initializing k8s client")
 
-	_client, err = client.New(_cfg, client.Options{
-		Scheme: _scheme,
+	client, err := client.New(cfg, client.Options{
+		Scheme: scheme,
 	})
 	Expect(err).ToNot(HaveOccurred())
+
+	_client = NewTestClient(client)
+
+	By("Building manager binary")
+
+	root, err := projectRoot()
+	Expect(err).ToNot(HaveOccurred())
+
+	_binPath, err = gexec.Build(filepath.Join(root, "cmd", "reference-addon-manager"))
+	Expect(err).ToNot(HaveOccurred())
+
+	By("writing kube.config")
+
+	user, err := testEnv.AddUser(
+		envtest.User{
+			Name:   "reference-addon",
+			Groups: []string{"reference-addon"},
+		},
+		nil,
+	)
+	Expect(err).ToNot(HaveOccurred())
+
+	configFile, err := os.CreateTemp("", "refernce-addon-integration-*")
+	Expect(err).ToNot(HaveOccurred())
+
+	data, err := user.KubeConfig()
+	Expect(err).ToNot(HaveOccurred())
+
+	_, err = configFile.Write(data)
+	Expect(err).ToNot(HaveOccurred())
+
+	_kubeConfigPath = configFile.Name()
 })
 
-func cleanup() {
-	_cancel()
+func cleanup(env *envtest.Environment) func() {
+	return func() {
+		By("Stopping the test environment")
 
-	By("Stopping the test environment")
+		Expect(env.Stop()).Should(Succeed())
 
-	Expect(_testEnv.Stop()).Should(Succeed())
+		By("Cleaning up test artifacts")
+
+		gexec.CleanupBuildArtifacts()
+
+		Expect(remove(_kubeConfigPath)).Should(Succeed())
+	}
+}
+
+var errSetup = errors.New("test setup failed")
+
+func projectRoot() (string, error) {
+	var buf bytes.Buffer
+
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Stdout = &buf
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("determining top level directory from git: %w", errSetup)
+	}
+
+	return strings.TrimSpace(buf.String()), nil
+}
+
+func remove(path string) error {
+	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+		return nil
+	}
+
+	return os.Remove(_kubeConfigPath)
 }

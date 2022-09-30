@@ -3,18 +3,18 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/openshift/reference-addon/internal/controllers"
+	. "github.com/onsi/gomega/gexec"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var _ = Describe("Apply Network Policies Phase", Ordered, func() {
+var _ = Describe("Apply Network Policies Phase", func() {
 	var (
 		ctx                    context.Context
 		cancel                 context.CancelFunc
@@ -36,52 +36,45 @@ var _ = Describe("Apply Network Policies Phase", Ordered, func() {
 		operatorName = operatorNameGen()
 		parameterSecretName = parameterSecretNameGen()
 
-		By("Starting manager with controllers")
+		By("Starting manager")
 
-		mgr, err := ctrl.NewManager(_cfg, ctrl.Options{
-			Scheme: _scheme,
-		})
-		Expect(err).ToNot(HaveOccurred())
-
-		r, err := controllers.NewReferenceAddonReconciler(
-			mgr.GetClient(),
-			controllers.NewSecretParameterGetter(
-				mgr.GetClient(),
-				controllers.WithNamespace(namespace),
-				controllers.WithName(parameterSecretName),
-			),
-			controllers.WithAddonNamespace(namespace),
-			controllers.WithAddonParameterSecretName(parameterSecretName),
-			controllers.WithOperatorName(operatorName),
-			controllers.WithDeleteLabel(deleteLabel),
+		manager := exec.Command(_binPath,
+			"-namespace", namespace,
+			"-delete-label", deleteLabel,
+			"-operator-name", operatorName,
+			"-parameter-secret-name", parameterSecretName,
+			"-kubeconfig", _kubeConfigPath,
 		)
+
+		session, err := Start(manager, GinkgoWriter, GinkgoWriter)
 		Expect(err).ToNot(HaveOccurred())
-
-		Expect(r.SetupWithManager(mgr)).Should(Succeed())
-
-		go func() {
-			defer GinkgoRecover()
-
-			Expect(mgr.Start(ctx)).Should(Succeed())
-		}()
 
 		By("Creating the addon namespace")
 
 		ns := addonNamespace(namespace)
 
-		Expect(_client.Create(ctx, &ns)).Should(Succeed())
-		EventuallyObjectExists(ctx, &ns)
+		_client.Create(ctx, &ns)
 
-		DeferCleanup(cancel)
+		for _, obj := range generateRBAC("reference-addon", namespace) {
+			_client.Create(ctx, obj)
+		}
+
+		DeferCleanup(func() {
+			cancel()
+
+			By("Stopping the managers")
+
+			session.Interrupt()
+		})
 	})
 
 	When("no parameter secret exists", func() {
 		It("should not create a NetworkPolicy", func() {
 			secret := addonParameterSecret(parameterSecretName, namespace)
-			EventuallyObjectDoesNotExist(ctx, &secret)
+			_client.EventuallyObjectDoesNotExist(ctx, &secret)
 
 			np := addonNetworkPolicy(fmt.Sprintf("%s-ingress", operatorName), namespace)
-			EventuallyObjectDoesNotExist(ctx, &np)
+			_client.EventuallyObjectDoesNotExist(ctx, &np)
 		})
 	})
 
@@ -90,22 +83,19 @@ var _ = Describe("Apply Network Policies Phase", Ordered, func() {
 			By("Creating the parameter Secret")
 
 			secret := addonParameterSecret(parameterSecretName, namespace)
-			Expect(_client.Create(ctx, &secret)).Should(Succeed())
-
-			EventuallyObjectExists(ctx, &secret)
+			_client.Create(ctx, &secret)
 
 			DeferCleanup(func() {
 				By("Deleting the parameter Secret")
 
-				err := _client.Delete(ctx, &secret)
-				Expect(client.IgnoreNotFound(err)).ToNot(HaveOccurred())
+				_client.Delete(ctx, &secret)
 			})
 		})
 
 		Context("ApplyNetworkPolicies set to 'nil'", func() {
 			It("should not create a NetworkPolicy", func() {
 				np := addonNetworkPolicy(fmt.Sprintf("%s-ingress", operatorName), namespace)
-				EventuallyObjectDoesNotExist(ctx, &np)
+				_client.EventuallyObjectDoesNotExist(ctx, &np)
 			})
 		})
 
@@ -115,10 +105,10 @@ var _ = Describe("Apply Network Policies Phase", Ordered, func() {
 				secret.Data = map[string][]byte{
 					"applynetworkpolicies": []byte("false"),
 				}
-				Expect(_client.Update(ctx, &secret)).Should(Succeed())
+				_client.Update(ctx, &secret)
 
 				np := addonNetworkPolicy(fmt.Sprintf("%s-ingress", operatorName), namespace)
-				EventuallyObjectDoesNotExist(ctx, &np)
+				_client.EventuallyObjectDoesNotExist(ctx, &np)
 			})
 		})
 
@@ -128,10 +118,10 @@ var _ = Describe("Apply Network Policies Phase", Ordered, func() {
 				secret.Data = map[string][]byte{
 					"applynetworkpolicies": []byte("true"),
 				}
-				Expect(_client.Update(ctx, &secret)).Should(Succeed())
+				_client.Update(ctx, &secret)
 
 				np := addonNetworkPolicy(fmt.Sprintf("%s-ingress", operatorName), namespace)
-				EventuallyObjectExists(ctx, &np)
+				_client.EventuallyObjectExists(ctx, &np, WithTimeout(5*time.Second))
 			})
 		})
 	})

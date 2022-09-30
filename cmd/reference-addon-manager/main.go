@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -35,42 +34,32 @@ func init() {
 	metrics.RegisterMetrics()
 }
 
-const (
-	addonNamespace           = "redhat-reference-addon"
-	operatorName             = "reference-addon"
-	deleteLabel              = "api.openshift.com/addon-reference-addon-delete"
-	addonParameterSecretname = "addon-reference-addon-parameters"
-)
-
 func main() {
-	var (
-		metricsAddr           string
-		pprofAddr             string
-		probeAddr             string
-		enableLeaderElection  bool
-		enableMetricsRecorder bool
-	)
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&pprofAddr, "pprof-addr", "", "The address the pprof web endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081",
-		"The address the probe endpoint binds to.")
-	flag.BoolVar(&enableMetricsRecorder, "enable-metrics-recorder", true, "Enable recording Addon Metrics")
-	flag.Parse()
+	opts := options{
+		DeleteLabel:           "api.openshift.com/addon-reference-addon-delete",
+		EnableMetricsRecorder: true,
+		MetricsAddr:           ":8080",
+		OperatorName:          "reference-addon",
+		ParameterSecretname:   "addon-reference-addon-parameters",
+		ProbeAddr:             ":8081",
+	}
+
+	if err := opts.Process(); err != nil {
+		setupLog.Error(err, "processing options")
+		os.Exit(1)
+	}
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
-		HealthProbeBindAddress:     probeAddr,
+		MetricsBindAddress:         opts.MetricsAddr,
+		HealthProbeBindAddress:     opts.ProbeAddr,
 		Port:                       9443,
 		LeaderElectionResourceLock: "leases",
-		LeaderElection:             enableLeaderElection,
+		LeaderElection:             opts.EnableLeaderElection,
 		LeaderElectionID:           "8a4hp84a6s.addon-operator-lock",
-		Namespace:                  addonNamespace,
+		Namespace:                  opts.Namespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -80,7 +69,7 @@ func main() {
 	// -----
 	// PPROF
 	// -----
-	if len(pprofAddr) > 0 {
+	if len(opts.PprofAddr) > 0 {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -88,7 +77,7 @@ func main() {
 		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-		s := &http.Server{Addr: pprofAddr, Handler: mux}
+		s := &http.Server{Addr: opts.PprofAddr, Handler: mux}
 		err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 			errCh := make(chan error)
 			defer func() {
@@ -130,14 +119,14 @@ func main() {
 		client,
 		controllers.NewSecretParameterGetter(
 			client,
-			controllers.WithNamespace(addonNamespace),
-			controllers.WithName(addonParameterSecretname),
+			controllers.WithNamespace(opts.Namespace),
+			controllers.WithName(opts.ParameterSecretname),
 		),
 		controllers.WithLog{Log: ctrl.Log.WithName("controllers").WithName("ReferenceAddon")},
-		controllers.WithAddonNamespace(addonNamespace),
-		controllers.WithAddonParameterSecretName(addonParameterSecretname),
-		controllers.WithOperatorName(operatorName),
-		controllers.WithDeleteLabel(deleteLabel),
+		controllers.WithAddonNamespace(opts.Namespace),
+		controllers.WithAddonParameterSecretName(opts.ParameterSecretname),
+		controllers.WithOperatorName(opts.OperatorName),
+		controllers.WithDeleteLabel(opts.DeleteLabel),
 	)
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")

@@ -1,4 +1,4 @@
-package controllers
+package integration
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	refapis "github.com/openshift/reference-addon/apis"
+	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	olmcrds "github.com/operator-framework/api/crds"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -27,7 +28,7 @@ import (
 
 var (
 	_binPath        string
-	_client         *TestClient
+	_client         *internaltesting.TestClient
 	_kubeConfigPath string
 )
 
@@ -43,6 +44,9 @@ func TestSuite(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	root, err := projectRoot()
+	Expect(err).ToNot(HaveOccurred())
+
 	By("Registering schemes")
 
 	scheme := runtime.NewScheme()
@@ -69,7 +73,7 @@ var _ = BeforeSuite(func() {
 			*olmcrds.ClusterServiceVersion(),
 		},
 		Paths: []string{
-			"../../config/deploy/reference.addons.managed.openshift.io_referenceaddons.yaml",
+			filepath.Join(root, "config", "deploy", "reference.addons.managed.openshift.io_referenceaddons.yaml"),
 		},
 		Scheme: scheme,
 	})
@@ -82,12 +86,9 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	_client = NewTestClient(client)
+	_client = internaltesting.NewTestClient(client)
 
 	By("Building manager binary")
-
-	root, err := projectRoot()
-	Expect(err).ToNot(HaveOccurred())
 
 	_binPath, err = gexec.Build(filepath.Join(root, "cmd", "reference-addon-manager"))
 	Expect(err).ToNot(HaveOccurred())

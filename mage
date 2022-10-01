@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+export PROJECT_ROOT="${PWD}"
+export DEPENDENCY_DIR="${PROJECT_ROOT}/.cache/dependencies"
+export MAGEFILE_CACHE="${PROJECT_ROOT}/.cache/magefile"
+export GOFLAGS=""
+
+if [ ! -f "bin/mage" ]; then
+  go build -o bin/mage ./cmd/mage
+fi
+
+exec ./bin/mage -v "$@"

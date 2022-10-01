@@ -1,4 +1,4 @@
-package controllers
+package integration
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gexec"
+	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,7 +115,7 @@ var _ = Describe("Uninstall Phase", func() {
 				_client.Update(ctx, &updatedCM)
 
 				csv := addonCSV(operatorName, namespace)
-				_client.EventuallyObjectDoesNotExist(ctx, &csv, WithTimeout(2*time.Second))
+				_client.EventuallyObjectDoesNotExist(ctx, &csv, internaltesting.WithTimeout(2*time.Second))
 			})
 		})
 	})

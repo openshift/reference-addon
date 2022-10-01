@@ -1,4 +1,4 @@
-package controllers
+package integration
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gexec"
+	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -121,7 +122,7 @@ var _ = Describe("Apply Network Policies Phase", func() {
 				_client.Update(ctx, &secret)
 
 				np := addonNetworkPolicy(fmt.Sprintf("%s-ingress", operatorName), namespace)
-				_client.EventuallyObjectExists(ctx, &np, WithTimeout(5*time.Second))
+				_client.EventuallyObjectExists(ctx, &np, internaltesting.WithTimeout(5*time.Second))
 			})
 		})
 	})

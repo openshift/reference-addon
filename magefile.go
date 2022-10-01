@@ -10,16 +10,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/mt-sre/go-ci/command"
+	"github.com/mt-sre/go-ci/container"
 )
 
 var Aliases = map[string]interface{}{
 	"lint":     All.Lint,
 	"generate": All.Generate,
-	"test": All.Test,
+	"test":     All.Test,
 }
 
 type All mg.Namespace
@@ -76,7 +78,53 @@ var _projectRoot = func() string {
 	return strings.TrimSpace(topLevel.Stdout())
 }()
 
+var _module = func() string {
+	module := gocmd(command.WithArgs{"mod", "why"})
+
+	if err := module.Run(); err != nil || !module.Success() {
+		panic("failed to get current branch")
+	}
+
+	lines := strings.Split(module.Stdout(), "\n")
+
+	if len(lines) < 2 {
+		panic("module not found")
+	}
+
+	return lines[1]
+}()
+
+var _version = strings.ReplaceAll(_branch, "/", "-") + "-" + _shortSHA
+
+var _branch = func() string {
+	branch := git(command.WithArgs{"rev-parse", "--abbrev-ref", "HEAD"})
+
+	if err := branch.Run(); err != nil || !branch.Success() {
+		panic("failed to get current branch")
+	}
+
+	return strings.TrimSpace(branch.Stdout())
+}()
+
+var _shortSHA = func() string {
+	sha := git(command.WithArgs{"rev-parse", "--short", "HEAD"})
+
+	if err := sha.Run(); err != nil || !sha.Success() {
+		panic("failed to get short SHA")
+	}
+
+	return strings.TrimSpace(sha.Stdout())
+}()
+
 var git = command.NewCommandAlias("git")
+
+var _managerImageReference = func() string {
+	if ref, ok := os.LookupEnv("MANAGER_IMAGE_REF"); ok {
+		return ref
+	}
+
+	return "quay.io/app-sre/reference-addon-manager"
+}()
 
 type Deps mg.Namespace
 
@@ -147,6 +195,135 @@ func setupDepsBin() error {
 // Removes any existing dependency binaries
 func (Deps) Clean() error {
 	return sh.Rm(_depBin)
+}
+
+type Build mg.Namespace
+
+func (b Build) Manager(ctx context.Context) error {
+	mg.CtxDeps(
+		ctx,
+		All.Generate,
+	)
+
+	return buildGoBinary(ctx,
+		filepath.Join(_projectRoot, "cmd", "reference-addon-manager"),
+		filepath.Join("bin", "linux_amd64", "reference-addon-manager"),
+		withGoBuildArgs{
+			"CGO_ENABLED": "0",
+			"GOOS":        "linux",
+			"GOARCH":      "amd64",
+		},
+		withLDFlags{
+			"-w",
+			fmt.Sprintf("-X %s/internal/version.Version=%s", _module, _version),
+			fmt.Sprintf("-X %s/internal/version.Branch=%s", _module, _branch),
+			fmt.Sprintf("-X %s/internal/version.Commit=%s", _module, _shortSHA),
+			fmt.Sprintf("-X %s/internal/version.BuildDate=%d", _module, time.Now().Unix()),
+		},
+	)
+}
+
+func buildGoBinary(ctx context.Context, srcPath, outPath string, opts ...goBuildOption) error {
+	cfg := newGoBuildConfig()
+	cfg.Option(opts...)
+
+	options := []command.CommandOption{
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithCurrentEnv(true),
+		command.WithEnv(cfg.Args),
+		command.WithArgs{"build"},
+	}
+
+	if len(cfg.LDFlags) > 0 {
+		options = append(options, command.WithArgs{
+			"-ldflags", strings.Join(cfg.LDFlags, " "),
+		})
+	}
+
+	options = append(options,
+		command.WithArgs{"-o", outPath},
+		command.WithArgs{srcPath},
+	)
+
+	build := gocmd(options...)
+	if err := build.Run(); err != nil {
+		return fmt.Errorf("starting to build go binary: %w", err)
+	}
+
+	if !build.Success() {
+		return fmt.Errorf("building go binary: %w", build.Error())
+	}
+
+	return nil
+}
+
+var ErrNoContainerRuntime = errors.New("no container runtime")
+
+func (Build) ManagerImage(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		All.Generate,
+		mg.F(buildImage, "Dockerfile", _managerImageReference+":"+_version, "."),
+	)
+}
+
+func buildImage(ctx context.Context, file, ref, dir string) error {
+	runtime, ok := container.Runtime()
+	if !ok {
+		return ErrNoContainerRuntime
+	}
+
+	build := command.NewCommand(runtime,
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithArgs{
+			"build", "-f", file, "-t", ref, dir,
+		},
+	)
+
+	if err := build.Run(); err != nil {
+		return fmt.Errorf("starting to build image %q: %w", ref, err)
+	}
+
+	if !build.Success() {
+		return fmt.Errorf("building image %q: %w", ref, build.Error())
+	}
+
+	return nil
+}
+
+type Release mg.Namespace
+
+func (Release) ManagerImage(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		Build.ManagerImage,
+		mg.F(pushImage, _managerImageReference+":"+_version),
+	)
+}
+
+func pushImage(ctx context.Context, ref string) error {
+	runtime, ok := container.Runtime()
+	if !ok {
+		return ErrNoContainerRuntime
+	}
+
+	push := command.NewCommand(runtime,
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithArgs{"push", ref},
+	)
+
+	if err := push.Run(); err != nil {
+		return fmt.Errorf("starting to push image %q: %w", ref, err)
+	}
+
+	if !push.Success() {
+		return fmt.Errorf("pushing image %q: %w", ref, push.Error())
+	}
+
+	return nil
 }
 
 type Check mg.Namespace
@@ -306,7 +483,7 @@ func (Test) Integration(ctx context.Context) error {
 		command.WithCurrentEnv(true),
 		command.WithEnv{
 			"KUBEBUILDER_ASSETS": setup.Stdout(),
-			"XDG_CACHE_HOME": filepath.Join(_projectRoot, ".cache"),
+			"XDG_CACHE_HOME":     filepath.Join(_projectRoot, ".cache"),
 		},
 		command.WithConsoleOut(mg.Verbose()),
 		command.WithContext{Context: ctx},
@@ -388,3 +565,38 @@ func (Generate) Boilerplate(ctx context.Context) error {
 }
 
 var controllerGen = command.NewCommandAlias(filepath.Join(_depBin, "controller-gen"))
+
+func newGoBuildConfig() goBuildConfig {
+	return goBuildConfig{
+		Args: make(map[string]string),
+	}
+}
+
+type goBuildConfig struct {
+	Args    map[string]string
+	LDFlags []string
+}
+
+func (c *goBuildConfig) Option(opts ...goBuildOption) {
+	for _, opt := range opts {
+		opt.ConfigureGoBuild(c)
+	}
+}
+
+type goBuildOption interface {
+	ConfigureGoBuild(*goBuildConfig)
+}
+
+type withGoBuildArgs map[string]string
+
+func (w withGoBuildArgs) ConfigureGoBuild(c *goBuildConfig) {
+	for k, v := range w {
+		c.Args[k] = v
+	}
+}
+
+type withLDFlags []string
+
+func (w withLDFlags) ConfigureGoBuild(c *goBuildConfig) {
+	c.LDFlags = append(c.LDFlags, []string(w)...)
+}

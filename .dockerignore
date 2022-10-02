@@ -23,3 +23,6 @@ config/olm/reference-addon.csv.yaml
 
 docs
 OWNERS
+
+bundle
+bundle.Dockerfile

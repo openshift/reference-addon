@@ -1,11 +1,16 @@
 # 1.17.12-8
 FROM registry.access.redhat.com/ubi9/go-toolset@sha256:fc7503a79725f82b72d337fdd694a58609c73b5a85eeb92f1771962526514e5d AS builder
 
-# cache optimization
+# main cache optimization
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
 
+# tools cache optimization
+COPY tools/ tools/
+RUN cd tools && go mod download
+
+# build manager binary
 COPY . .
 RUN ./mage build:manager
 

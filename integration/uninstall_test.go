@@ -72,9 +72,11 @@ var _ = Describe("Uninstall Phase", func() {
 
 			session.Interrupt()
 
-			By("Ensuring the addon CSV does not exist")
+			if usingExistingCluster() {
+				By("Deleting test namspace")
 
-			_client.Delete(ctx, &csv)
+				_client.Delete(ctx, &ns)
+			}
 		})
 	})
 

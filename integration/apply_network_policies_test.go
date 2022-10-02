@@ -66,6 +66,12 @@ var _ = Describe("Apply Network Policies Phase", func() {
 			By("Stopping the managers")
 
 			session.Interrupt()
+
+			if usingExistingCluster() {
+				By("Deleting test namspace")
+
+				_client.Delete(ctx, &ns)
+			}
 		})
 	})
 

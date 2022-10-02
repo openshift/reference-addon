@@ -7,8 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/mt-sre/go-ci/command"
 	"github.com/mt-sre/go-ci/container"
+	"github.com/mt-sre/go-ci/web"
 )
 
 var Aliases = map[string]interface{}{
@@ -94,7 +98,43 @@ var _module = func() string {
 	return lines[1]
 }()
 
-var _version = strings.ReplaceAll(_branch, "/", "-") + "-" + _shortSHA
+var _version = func() string {
+	const zeroVer = "v0.0.0"
+
+	if bundleVersion, ok := os.LookupEnv("BUNDLE_VERSION"); ok {
+		return bundleVersion
+	}
+
+	listTags := git(command.WithArgs{"tag", "-l"})
+
+	if err := listTags.Run(); err != nil || !listTags.Success() {
+		panic("failed to get tags")
+	}
+
+	tags := strings.Fields(listTags.Stdout())
+	if len(tags) < 1 {
+		return zeroVer
+	}
+
+	latest := tags[len(tags)-1]
+
+	commitCount := git(command.WithArgs{"rev-list", latest + "..", "--count"})
+
+	if err := commitCount.Run(); err != nil || !commitCount.Success() {
+		return zeroVer
+	}
+
+	count, err := strconv.Atoi(strings.TrimSpace(commitCount.Stdout()))
+	if err != nil {
+		return zeroVer
+	}
+
+	if count < 1 {
+		return latest
+	}
+
+	return fmt.Sprintf("%s-%d", latest, count)
+}()
 
 var _branch = func() string {
 	branch := git(command.WithArgs{"rev-parse", "--abbrev-ref", "HEAD"})
@@ -116,8 +156,6 @@ var _shortSHA = func() string {
 	return strings.TrimSpace(sha.Stdout())
 }()
 
-var git = command.NewCommandAlias("git")
-
 var _managerImageReference = func() string {
 	if ref, ok := os.LookupEnv("MANAGER_IMAGE_REF"); ok {
 		return ref
@@ -125,6 +163,8 @@ var _managerImageReference = func() string {
 
 	return "quay.io/app-sre/reference-addon-manager"
 }()
+
+var git = command.NewCommandAlias("git")
 
 type Deps mg.Namespace
 
@@ -181,6 +221,31 @@ func updateGODependency(ctx context.Context, src string) error {
 
 	if !install.Success() {
 		return fmt.Errorf("installing command from source %q: %w", src, install.Error())
+	}
+
+	return nil
+}
+
+func (Deps) UpdateOperatorSDK(ctx context.Context) error {
+	const version = "v1.23.0"
+
+	out := filepath.Join(_depBin, "operator-sdk")
+
+	url := fmt.Sprintf(
+		"https://github.com/operator-framework/operator-sdk/releases/download/%s/operator-sdk_%s_%s",
+		version,
+		runtime.GOOS,
+		runtime.GOARCH,
+	)
+
+	if err := web.DownloadFile(ctx, url, out); err != nil {
+		return fmt.Errorf("downloading operator-sdk binary: %w", err)
+	}
+
+	const perms = fs.FileMode(0755)
+
+	if err := os.Chmod(out, perms); err != nil {
+		return fmt.Errorf("changing permissions: %w", err)
 	}
 
 	return nil
@@ -258,8 +323,6 @@ func buildGoBinary(ctx context.Context, srcPath, outPath string, opts ...goBuild
 	return nil
 }
 
-var ErrNoContainerRuntime = errors.New("no container runtime")
-
 func (Build) ManagerImage(ctx context.Context) {
 	mg.CtxDeps(
 		ctx,
@@ -268,10 +331,12 @@ func (Build) ManagerImage(ctx context.Context) {
 	)
 }
 
+var errNoContainerRuntime = errors.New("no container runtime")
+
 func buildImage(ctx context.Context, file, ref, dir string) error {
 	runtime, ok := container.Runtime()
 	if !ok {
-		return ErrNoContainerRuntime
+		return errNoContainerRuntime
 	}
 
 	build := command.NewCommand(runtime,
@@ -306,7 +371,7 @@ func (Release) ManagerImage(ctx context.Context) {
 func pushImage(ctx context.Context, ref string) error {
 	runtime, ok := container.Runtime()
 	if !ok {
-		return ErrNoContainerRuntime
+		return errNoContainerRuntime
 	}
 
 	push := command.NewCommand(runtime,
@@ -424,7 +489,7 @@ func (Test) Unit(ctx context.Context) error {
 	)
 
 	test := gocmd(
-		command.WithArgs{"test", "-race", "-v", "./cmd/...", "./internal/..."},
+		command.WithArgs{"test", "-race", "-count=1", "-v", "./cmd/...", "./internal/..."},
 		command.WithCurrentEnv(true),
 		command.WithEnv{
 			"CGO_ENABLED": "1",
@@ -449,24 +514,18 @@ func (Test) Integration(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
 		Deps.UpdateGinkgo,
-		Deps.UpdateSetupEnvtest,
 	)
 
-	setup := setupEnvtest(
-		command.WithArgs{
-			"use", "-p", "path", "--bin-dir=" + _depBin, "1.20.x!",
-		},
-	)
+	var assetsDir string
 
-	if err := setup.Run(); err != nil {
-		return fmt.Errorf("starting to setup envtest: %w", err)
+	if !usingExistingCluster() {
+		var err error
+
+		assetsDir, err = setupEnvTest(ctx, _depBin, "1.22.x!")
+		if err != nil {
+			return fmt.Errorf("setting up env-test: %w", err)
+		}
 	}
-
-	if !setup.Success() {
-		return fmt.Errorf("setting up envtest: %w", setup.Error())
-	}
-
-	fmt.Println(setup.Stdout())
 
 	test := ginkgo(
 		command.WithArgs{
@@ -482,8 +541,9 @@ func (Test) Integration(ctx context.Context) error {
 		},
 		command.WithCurrentEnv(true),
 		command.WithEnv{
-			"KUBEBUILDER_ASSETS": setup.Stdout(),
-			"XDG_CACHE_HOME":     filepath.Join(_projectRoot, ".cache"),
+			"KUBEBUILDER_ASSETS": assetsDir,
+			// Ensures local cache location
+			"XDG_CACHE_HOME": filepath.Join(_projectRoot, ".cache"),
 		},
 		command.WithConsoleOut(mg.Verbose()),
 		command.WithContext{Context: ctx},
@@ -500,10 +560,36 @@ func (Test) Integration(ctx context.Context) error {
 	return fmt.Errorf("running integration tests: %w", test.Error())
 }
 
-var (
-	ginkgo       = command.NewCommandAlias(filepath.Join(_depBin, "ginkgo"))
-	setupEnvtest = command.NewCommandAlias(filepath.Join(_depBin, "setup-envtest"))
-)
+var ginkgo = command.NewCommandAlias(filepath.Join(_depBin, "ginkgo"))
+
+func usingExistingCluster() bool {
+	return strings.ToLower(os.Getenv("USE_EXISTING_CLUSTER")) == "true"
+}
+
+func setupEnvTest(ctx context.Context, dir, version string) (string, error) {
+	mg.CtxDeps(
+		ctx,
+		Deps.UpdateSetupEnvtest,
+	)
+
+	setup := setupEnvtestCmd(
+		command.WithArgs{
+			"use", "-p", "path", "--bin-dir", _depBin, version,
+		},
+	)
+
+	if err := setup.Run(); err != nil {
+		return "", fmt.Errorf("starting setup: %w", err)
+	}
+
+	if !setup.Success() {
+		return "", fmt.Errorf("setting up: %w", setup.Error())
+	}
+
+	return setup.Stdout(), nil
+}
+
+var setupEnvtestCmd = command.NewCommandAlias(filepath.Join(_depBin, "setup-envtest"))
 
 type Generate mg.Namespace
 
@@ -565,6 +651,69 @@ func (Generate) Boilerplate(ctx context.Context) error {
 }
 
 var controllerGen = command.NewCommandAlias(filepath.Join(_depBin, "controller-gen"))
+
+func (Generate) Bundle(ctx context.Context) error {
+	mg.CtxDeps(
+		ctx,
+		Deps.UpdateOperatorSDK,
+		Generate.Manifests,
+	)
+
+	version := strings.TrimPrefix(_version, "v")
+
+	gen := operatorSDK(
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithArgs{
+			"generate", "bundle",
+			"--package", "reference-addon",
+			"--input-dir", filepath.Join("config", "deploy"),
+			// "--output-dir", filepath.Join("config", "bundle"),
+			"--version", version,
+			"--default-channel", "alpha",
+		},
+	)
+
+	if err := gen.Run(); err != nil {
+		return fmt.Errorf("starting to generate bundles: %w", err)
+	}
+
+	if !gen.Success() {
+		return fmt.Errorf("generating bundles: %w", gen.Error())
+	}
+
+	return nil
+}
+
+var operatorSDK = command.NewCommandAlias(filepath.Join(_depBin, "operator-sdk"))
+
+func (Release) Clean() error {
+	if err := remove(filepath.Join(_projectRoot,"bundle.Dockerfile")); err != nil {
+		return fmt.Errorf("removing 'bundle.Dockerfile': %w", err)
+	}
+
+	if err := removeAll(filepath.Join(_projectRoot, "bundle")); err != nil {
+		return fmt.Errorf("removing bundle directory: %w", err)
+	}
+
+	return nil
+}
+
+func remove(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
+
+func removeAll(path string) error {
+	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
 
 func newGoBuildConfig() goBuildConfig {
 	return goBuildConfig{

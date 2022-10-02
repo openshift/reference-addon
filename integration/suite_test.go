@@ -30,6 +30,7 @@ var (
 	_binPath        string
 	_client         *internaltesting.TestClient
 	_kubeConfigPath string
+	_testEnv        *envtest.Environment
 )
 
 // To run these tests with an external cluster
@@ -56,15 +57,15 @@ var _ = BeforeSuite(func() {
 
 	By("Starting test environment")
 
-	testEnv := &envtest.Environment{
+	_testEnv = &envtest.Environment{
 		Scheme: scheme,
 	}
 
-	cfg, err := testEnv.Start()
+	cfg, err := _testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	DeferCleanup(cleanup(testEnv))
+	DeferCleanup(cleanup(_testEnv))
 
 	By("Installing CRD's")
 
@@ -90,12 +91,15 @@ var _ = BeforeSuite(func() {
 
 	By("Building manager binary")
 
-	_binPath, err = gexec.Build(filepath.Join(root, "cmd", "reference-addon-manager"))
+	_binPath, err = gexec.BuildWithEnvironment(
+		filepath.Join(root, "cmd", "reference-addon-manager"),
+		[]string{"CGO_ENABLED=0"},
+	)
 	Expect(err).ToNot(HaveOccurred())
 
 	By("writing kube.config")
 
-	user, err := testEnv.AddUser(
+	user, err := _testEnv.AddUser(
 		envtest.User{
 			Name:   "reference-addon",
 			Groups: []string{"reference-addon"},
@@ -152,4 +156,8 @@ func remove(path string) error {
 	}
 
 	return os.Remove(_kubeConfigPath)
+}
+
+func usingExistingCluster() bool {
+	return _testEnv.UseExistingCluster != nil && *_testEnv.UseExistingCluster
 }

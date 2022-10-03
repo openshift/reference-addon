@@ -572,10 +572,31 @@ func (Check) Dirty(ctx context.Context) error {
 	}
 
 	if out := status.Stdout(); out != "" {
+		if diff, err := getDiff(ctx); err == nil {
+			fmt.Fprintln(os.Stdout, diff)
+		}
+
 		return errors.New("repo is dirty")
 	}
 
 	return nil
+}
+
+func getDiff(ctx context.Context) (string, error) {
+	diff := git(
+		command.WithContext{Context: ctx},
+		command.WithArgs{"diff", "--name-status"},
+	)
+
+	if err := diff.Run(); err != nil {
+		return "", fmt.Errorf("starting to get diff: %w", err)
+	}
+
+	if !diff.Success() {
+		return "", fmt.Errorf("getting diff: %w", diff.Error())
+	}
+
+	return strings.TrimSpace(diff.Stdout()), nil
 }
 
 type Test mg.Namespace

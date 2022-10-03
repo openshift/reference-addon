@@ -23,12 +23,14 @@ import (
 )
 
 var Aliases = map[string]interface{}{
-	"build":         Build.Manager,
-	"bundle":        Generate.Bundle,
-	"generate":      All.Generate,
-	"lint":          All.Lint,
-	"test":          All.Test,
-	"cache-ci-deps": All.CIDeps,
+	"build":            Build.Manager,
+	"bundle":           Generate.Bundle,
+	"generate":         All.Generate,
+	"lint":             All.Lint,
+	"test":             All.Test,
+	"test-integration": Test.Integration,
+	"test-unit":        Test.Unit,
+	"cache-ci-deps":    All.CIDeps,
 }
 
 type All mg.Namespace

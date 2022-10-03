@@ -6,6 +6,7 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,8 +21,10 @@ type TestClient struct {
 }
 
 func (c *TestClient) Create(ctx context.Context, obj client.Object, opts ...RequestOption) {
-	ExpectWithOffset(1, c.client.Create(ctx, obj)).Should(Succeed())
-	c.EventuallyObjectExists(ctx, obj, opts...)
+	if err := c.client.Get(ctx, client.ObjectKeyFromObject(obj), obj); errors.IsNotFound(err) {
+		ExpectWithOffset(1, c.client.Create(ctx, obj)).Should(Succeed())
+		c.EventuallyObjectExists(ctx, obj, opts...)
+	}
 }
 
 func (c *TestClient) Update(ctx context.Context, obj client.Object, opts ...RequestOption) {

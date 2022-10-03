@@ -1,8 +1,16 @@
 package integration
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
+	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,11 +28,24 @@ func nameGenerator(pfx string) func() string {
 	}
 }
 
-func generateRBAC(group, namespace string) []client.Object {
+func getRBAC(namespace, group string) ([]client.Object, error) {
+	root, err := projectRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	role, err := internaltesting.LoadUnstructuredFromFile(filepath.Join(root, "config", "deploy", "role.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("loading role: %w", err)
+	}
+
+	role.SetNamespace(namespace)
+
 	return []client.Object{
+		role,
 		&rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      group,
+				Name:      role.GetName(),
 				Namespace: namespace,
 			},
 			Subjects: []rbacv1.Subject{
@@ -35,117 +56,32 @@ func generateRBAC(group, namespace string) []client.Object {
 			},
 			RoleRef: rbacv1.RoleRef{
 				Kind: "Role",
-				Name: group,
+				Name: role.GetName(),
 			},
 		},
-		&rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      group,
-				Namespace: namespace,
-			},
-			Rules: []rbacv1.PolicyRule{
-				{
-					APIGroups: []string{
-						"",
-					},
-					Resources: []string{
-						"events",
-					},
-					Verbs: []string{
-						"create",
-					},
-				},
-				{
-					APIGroups: []string{
-						"",
-					},
-					Resources: []string{
-						"secrets",
-					},
-					Verbs: []string{
-						"get",
-						"list",
-						"watch",
-					},
-				},
-				{
-					APIGroups: []string{
-						"",
-					},
-					Resources: []string{
-						"configmaps",
-					},
-					Verbs: []string{
-						"get",
-						"list",
-						"watch",
-					},
-				},
-				{
-					APIGroups: []string{
-						"coordination.k8s.io",
-					},
-					Resources: []string{
-						"leases",
-					},
-					Verbs: []string{
-						"get",
-						"list",
-						"watch",
-						"create",
-						"update",
-						"patch",
-						"delete",
-					},
-				},
-				{
-					APIGroups: []string{
-						"reference.addons.managed.openshift.io",
-					},
-					Resources: []string{
-						"referenceaddons",
-					},
-					Verbs: []string{
-						"get",
-						"list",
-						"watch",
-						"create",
-						"update",
-						"patch",
-						"delete",
-					},
-				},
-				{
-					APIGroups: []string{
-						"operators.coreos.com",
-					},
-					Resources: []string{
-						"clusterserviceversions",
-					},
-					Verbs: []string{
-						"get",
-						"list",
-						"watch",
-						"delete",
-					},
-				},
-				{
-					APIGroups: []string{
-						"networking.k8s.io",
-					},
-					Resources: []string{
-						"networkpolicies",
-					},
-					Verbs: []string{
-						"get",
-						"list",
-						"watch",
-						"create",
-						"update",
-						"delete",
-					},
-				},
-			},
-		},
+	}, nil
+}
+
+func projectRoot() (string, error) {
+	var buf bytes.Buffer
+
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Stdout = &buf
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("determining top level directory from git: %w", errSetup)
 	}
+
+	return strings.TrimSpace(buf.String()), nil
+}
+
+var errSetup = errors.New("test setup failed")
+
+func remove(path string) error {
+	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+		return nil
+	}
+
+	return os.Remove(path)
 }

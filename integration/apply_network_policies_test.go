@@ -56,7 +56,10 @@ var _ = Describe("Apply Network Policies Phase", func() {
 
 		_client.Create(ctx, &ns)
 
-		for _, obj := range generateRBAC("reference-addon", namespace) {
+		rbac, err := getRBAC(namespace, managerGroup)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, obj := range rbac {
 			_client.Create(ctx, obj)
 		}
 

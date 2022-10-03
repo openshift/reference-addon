@@ -1,14 +1,8 @@
 package integration
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	refapis "github.com/openshift/reference-addon/apis"
@@ -24,6 +18,11 @@ import (
 	"github.com/onsi/gomega/gexec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+)
+
+const (
+	managerUser  = "reference-addon"
+	managerGroup = "reference-addon"
 )
 
 var (
@@ -101,8 +100,8 @@ var _ = BeforeSuite(func() {
 
 	user, err := _testEnv.AddUser(
 		envtest.User{
-			Name:   "reference-addon",
-			Groups: []string{"reference-addon"},
+			Name:   managerUser,
+			Groups: []string{managerGroup},
 		},
 		nil,
 	)
@@ -132,30 +131,6 @@ func cleanup(env *envtest.Environment) func() {
 
 		Expect(remove(_kubeConfigPath)).Should(Succeed())
 	}
-}
-
-var errSetup = errors.New("test setup failed")
-
-func projectRoot() (string, error) {
-	var buf bytes.Buffer
-
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	cmd.Stdout = &buf
-	cmd.Stderr = io.Discard
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("determining top level directory from git: %w", errSetup)
-	}
-
-	return strings.TrimSpace(buf.String()), nil
-}
-
-func remove(path string) error {
-	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
-		return nil
-	}
-
-	return os.Remove(_kubeConfigPath)
 }
 
 func usingExistingCluster() bool {

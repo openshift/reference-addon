@@ -23,13 +23,16 @@ import (
 )
 
 var Aliases = map[string]interface{}{
-	"lint":     All.Lint,
+	"build":    Build.Manager,
+	"bundle":   Generate.Bundle,
 	"generate": All.Generate,
+	"lint":     All.Lint,
 	"test":     All.Test,
 }
 
 type All mg.Namespace
 
+// Lint ensures source code conforms to formatting standars.
 func (All) Lint(ctx context.Context) {
 	mg.SerialCtxDeps(
 		ctx,
@@ -41,6 +44,7 @@ func (All) Lint(ctx context.Context) {
 	)
 }
 
+// Test runs all unit and integration tests.
 func (All) Test(ctx context.Context) {
 	mg.CtxDeps(
 		ctx,
@@ -50,11 +54,14 @@ func (All) Test(ctx context.Context) {
 	)
 }
 
+// Generate produces all generated pre-release artifacts.
 func (All) Generate(ctx context.Context) {
 	mg.CtxDeps(
 		ctx,
 		Generate.Manifests,
 		Generate.Boilerplate,
+		Generate.Deployment,
+		Generate.ClusterServiceVersion,
 	)
 }
 
@@ -156,6 +163,8 @@ var _shortSHA = func() string {
 	return strings.TrimSpace(sha.Stdout())
 }()
 
+var _taggedManagerImage = _managerImageReference + ":" + _version
+
 var _managerImageReference = func() string {
 	if ref, ok := os.LookupEnv("MANAGER_IMAGE_REF"); ok {
 		return ref
@@ -168,20 +177,44 @@ var git = command.NewCommandAlias("git")
 
 type Deps mg.Namespace
 
-func (Deps) UpdateControllerGen(ctx context.Context) error {
-	return updateGODependency(ctx, "sigs.k8s.io/controller-tools/cmd/controller-gen")
+// UpdateControllerGen updates the cached controller-gen binary.
+func (Deps) UpdateControllerGen(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		mg.F(updateGODependency, "sigs.k8s.io/controller-tools/cmd/controller-gen"),
+	)
 }
 
-func (Deps) UpdateGinkgo(ctx context.Context) error {
-	return updateGODependency(ctx, "github.com/onsi/ginkgo/v2/ginkgo")
+// UpdateGinkgo updates the cached ginkgo binary.
+func (Deps) UpdateGinkgo(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		mg.F(updateGODependency, "github.com/onsi/ginkgo/v2/ginkgo"),
+	)
 }
 
-func (Deps) UpdateGolangCILint(ctx context.Context) error {
-	return updateGODependency(ctx, "github.com/golangci/golangci-lint/cmd/golangci-lint")
+// UpdateGolangCILint updates the cached golangci-lint binary.
+func (Deps) UpdateGolangCILint(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		mg.F(updateGODependency, "github.com/golangci/golangci-lint/cmd/golangci-lint"),
+	)
 }
 
-func (Deps) UpdateSetupEnvtest(ctx context.Context) error {
-	return updateGODependency(ctx, "sigs.k8s.io/controller-runtime/tools/setup-envtest")
+// UpdateSetupEnvtest updates the cached setup-envtest binary.
+func (Deps) UpdateSetupEnvtest(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		mg.F(updateGODependency, "sigs.k8s.io/controller-runtime/tools/setup-envtest"),
+	)
+}
+
+// UpdateYQ updates the cached yq binary.
+func (Deps) UpdateYQ(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		mg.F(updateGODependency, "github.com/mikefarah/yq/v4"),
+	)
 }
 
 func updateGODependency(ctx context.Context, src string) error {
@@ -226,6 +259,7 @@ func updateGODependency(ctx context.Context, src string) error {
 	return nil
 }
 
+// UpdateOperatorSDK updates the cached operator-sdk binary.
 func (Deps) UpdateOperatorSDK(ctx context.Context) error {
 	const version = "v1.23.0"
 
@@ -257,13 +291,14 @@ func setupDepsBin() error {
 	return os.MkdirAll(_depBin, 0o774)
 }
 
-// Removes any existing dependency binaries
+// Clean removes any existing dependency binaries
 func (Deps) Clean() error {
 	return sh.Rm(_depBin)
 }
 
 type Build mg.Namespace
 
+// Manager builds the manager binary.
 func (b Build) Manager(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
@@ -323,11 +358,12 @@ func buildGoBinary(ctx context.Context, srcPath, outPath string, opts ...goBuild
 	return nil
 }
 
+// ManagerImage builds the manager container image.
 func (Build) ManagerImage(ctx context.Context) {
 	mg.CtxDeps(
 		ctx,
 		All.Generate,
-		mg.F(buildImage, "Dockerfile", _managerImageReference+":"+_version, "."),
+		mg.F(buildImage, "Dockerfile", _taggedManagerImage, _projectRoot),
 	)
 }
 
@@ -360,11 +396,14 @@ func buildImage(ctx context.Context, file, ref, dir string) error {
 
 type Release mg.Namespace
 
+// ManagerImage pushes the manager container image to the target repo.
+// The target repo can be modified by setting the environment variable
+// "MANAGER_IMAGE_REF" to a valid location.
 func (Release) ManagerImage(ctx context.Context) {
-	mg.CtxDeps(
+	mg.SerialCtxDeps(
 		ctx,
 		Build.ManagerImage,
-		mg.F(pushImage, _managerImageReference+":"+_version),
+		mg.F(pushImage, _taggedManagerImage),
 	)
 }
 
@@ -393,7 +432,7 @@ func pushImage(ctx context.Context, ref string) error {
 
 type Check mg.Namespace
 
-// Runs linter against source code.
+// Lint runs linter against source code.
 func (Check) Lint(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
@@ -401,8 +440,12 @@ func (Check) Lint(ctx context.Context) error {
 	)
 
 	run := golangci(
-		command.WithArgs{"run", "-v", "--fix"},
 		command.WithContext{Context: ctx},
+		command.WithArgs{"run", "-v", "--fix"},
+		command.WithCurrentEnv(true),
+		command.WithEnv{
+			"GOLANGCI_LINT_CACHE": filepath.Join(_projectRoot, ".cache", "golangci-lint"),
+		},
 	)
 
 	if err := run.Run(); err != nil {
@@ -420,8 +463,8 @@ func (Check) Lint(ctx context.Context) error {
 
 var golangci = command.NewCommandAlias(filepath.Join(_depBin, "golangci-lint"))
 
-// Ensures dependencies are correctly updated in the 'go.mod'
-// and 'go.sum' files.
+// Tidy ensures dependencies are correctly updated
+// in the 'go.mod/ and 'go.sum' files.
 func (Check) Tidy(ctx context.Context) error {
 	tidy := gocmd(
 		command.WithArgs{"mod", "tidy", "-compat=1.17"},
@@ -440,7 +483,8 @@ func (Check) Tidy(ctx context.Context) error {
 	return fmt.Errorf("tidying go dependencies: %w", tidy.Error())
 }
 
-// Ensures package dependencies have not been tampered with since download.
+// Verify ensures package dependencies have not been
+// tampered with since download.
 func (Check) Verify(ctx context.Context) error {
 	verify := gocmd(
 		command.WithArgs{"mod", "verify"},
@@ -459,6 +503,8 @@ func (Check) Verify(ctx context.Context) error {
 	return fmt.Errorf("verifying go dependencies: %w", verify.Error())
 }
 
+// Dirty checks if the git repository has
+// uncommitted changes.
 func (Check) Dirty(ctx context.Context) error {
 	status := git(
 		command.WithArgs{"status", "--porcelain"},
@@ -481,7 +527,7 @@ func (Check) Dirty(ctx context.Context) error {
 
 type Test mg.Namespace
 
-// Runs unit tests.
+// Unit runs unit tests.
 func (Test) Unit(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
@@ -509,11 +555,12 @@ func (Test) Unit(ctx context.Context) error {
 	return fmt.Errorf("running unit tests: %w", test.Error())
 }
 
-// Runs integration tests.
+// Integration runs integration tests.
 func (Test) Integration(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
 		Deps.UpdateGinkgo,
+		Generate.Manifests,
 	)
 
 	var assetsDir string
@@ -593,7 +640,7 @@ var setupEnvtestCmd = command.NewCommandAlias(filepath.Join(_depBin, "setup-envt
 
 type Generate mg.Namespace
 
-// Generates manifests.
+// Manifests generates object manifests.
 func (Generate) Manifests(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
@@ -624,7 +671,7 @@ func (Generate) Manifests(ctx context.Context) error {
 	return fmt.Errorf("generating manifests: %w", gen.Error())
 }
 
-// Generates objects.
+// Boilerplate generates object boilerplate.
 func (Generate) Boilerplate(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
@@ -652,11 +699,79 @@ func (Generate) Boilerplate(ctx context.Context) error {
 
 var controllerGen = command.NewCommandAlias(filepath.Join(_depBin, "controller-gen"))
 
+// Deployment applies templated values to
+// the manager Deployment.
+func (Generate) Deployment(ctx context.Context) {
+	var (
+		template = filepath.Join("config", "templates", "deployment.tpl.yaml")
+		out      = filepath.Join("config", "deploy", "deployment.yaml")
+	)
+
+	mg.CtxDeps(
+		ctx,
+		mg.F(yqEval, template, out,
+			fmt.Sprintf(".spec.template.spec.containers[0].image = %q", _taggedManagerImage),
+		),
+	)
+}
+
+// ClusterServiceVersion applies templated values to
+// the operator ClusterServiceVersion.
+func (Generate) ClusterServiceVersion(ctx context.Context) {
+	var (
+		skipRange = ">0.0.0 <=" + strings.TrimPrefix(_version, "v")
+		template  = filepath.Join("config", "templates", "reference-addon.csv.tpl.yaml")
+		out       = filepath.Join("config", "deploy", "reference-addon.csv.yaml")
+	)
+
+	mg.CtxDeps(
+		ctx,
+		mg.F(yqEval, template, out,
+			fmt.Sprintf(".metadata.annotations.containerImage = %q", _taggedManagerImage),
+			fmt.Sprintf(`.metadata.annotations."olm.skipRange" = %q`, skipRange),
+		),
+	)
+}
+
+func yqEval(ctx context.Context, template, out string, exprs ...string) error {
+	mg.CtxDeps(
+		ctx,
+		Deps.UpdateYQ,
+	)
+
+	expressions := strings.Join(exprs, " | ")
+
+	eval := yq(
+		command.WithContext{Context: ctx},
+		command.WithArgs{"eval", expressions, template},
+	)
+
+	if err := eval.Run(); err != nil {
+		return fmt.Errorf("starting to evaluting template %q: %w", template, err)
+	}
+
+	if !eval.Success() {
+		return fmt.Errorf("evaluating template %q: %w", template, eval.Error())
+	}
+
+	const perms = fs.FileMode(0644)
+
+	if err := os.WriteFile(out, []byte(eval.Stdout()), perms); err != nil {
+		return fmt.Errorf("writing file %q: %w", out, err)
+	}
+
+	return nil
+}
+
+var yq = command.NewCommandAlias(filepath.Join(_depBin, "yq"))
+
+// Bundle generates bundle artifacts.
 func (Generate) Bundle(ctx context.Context) error {
 	mg.CtxDeps(
 		ctx,
+		Release.ManagerImage,
 		Deps.UpdateOperatorSDK,
-		Generate.Manifests,
+		All.Generate,
 	)
 
 	version := strings.TrimPrefix(_version, "v")
@@ -668,9 +783,9 @@ func (Generate) Bundle(ctx context.Context) error {
 			"generate", "bundle",
 			"--package", "reference-addon",
 			"--input-dir", filepath.Join("config", "deploy"),
-			// "--output-dir", filepath.Join("config", "bundle"),
 			"--version", version,
 			"--default-channel", "alpha",
+			"--use-image-digests",
 		},
 	)
 
@@ -687,8 +802,9 @@ func (Generate) Bundle(ctx context.Context) error {
 
 var operatorSDK = command.NewCommandAlias(filepath.Join(_depBin, "operator-sdk"))
 
+// Clean removes left over bundle artifacts.
 func (Release) Clean() error {
-	if err := remove(filepath.Join(_projectRoot,"bundle.Dockerfile")); err != nil {
+	if err := remove(filepath.Join(_projectRoot, "bundle.Dockerfile")); err != nil {
 		return fmt.Errorf("removing 'bundle.Dockerfile': %w", err)
 	}
 

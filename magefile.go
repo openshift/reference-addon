@@ -23,14 +23,29 @@ import (
 )
 
 var Aliases = map[string]interface{}{
-	"build":    Build.Manager,
-	"bundle":   Generate.Bundle,
-	"generate": All.Generate,
-	"lint":     All.Lint,
-	"test":     All.Test,
+	"build":         Build.Manager,
+	"bundle":        Generate.Bundle,
+	"generate":      All.Generate,
+	"lint":          All.Lint,
+	"test":          All.Test,
+	"cache-ci-deps": All.CIDeps,
 }
 
 type All mg.Namespace
+
+// CIDeps caches all dependencies needed for CI.
+func (All) CIDeps(ctx context.Context) {
+	mg.SerialCtxDeps(
+		ctx,
+		Build.DownloadSource,
+		Deps.DownloadSource,
+		Deps.UpdateControllerGen,
+		Deps.UpdateYQ,
+		Deps.UpdateGolangCILint,
+		Deps.UpdateGinkgo,
+		Deps.UpdateSetupEnvtest,
+	)
+}
 
 // Lint ensures source code conforms to formatting standars.
 func (All) Lint(ctx context.Context) {
@@ -177,6 +192,25 @@ var git = command.NewCommandAlias("git")
 
 type Deps mg.Namespace
 
+func (Deps) DownloadSource(ctx context.Context) error {
+	download := gocmd(
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithWorkingDirectory(filepath.Join(_projectRoot, "tools")),
+		command.WithArgs{"mod", "download"},
+	)
+
+	if err := download.Run(); err != nil {
+		return fmt.Errorf("starting to download tools source dependencies: %w", err)
+	}
+
+	if !download.Success() {
+		return fmt.Errorf("downloading tools source dependencies: %w", download.Error())
+	}
+
+	return nil
+}
+
 // UpdateControllerGen updates the cached controller-gen binary.
 func (Deps) UpdateControllerGen(ctx context.Context) {
 	mg.CtxDeps(
@@ -297,6 +331,24 @@ func (Deps) Clean() error {
 }
 
 type Build mg.Namespace
+
+func (Build) DownloadSource(ctx context.Context) error {
+	download := gocmd(
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithArgs{"mod", "download"},
+	)
+
+	if err := download.Run(); err != nil {
+		return fmt.Errorf("starting to download source dependencies: %w", err)
+	}
+
+	if !download.Success() {
+		return fmt.Errorf("downloading source dependencies: %w", download.Error())
+	}
+
+	return nil
+}
 
 // Manager builds the manager binary.
 func (b Build) Manager(ctx context.Context) error {

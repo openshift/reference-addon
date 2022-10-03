@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/go-toolset:1.17.12-8 AS builder
+FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
 
 WORKDIR /workspace
 
@@ -20,8 +20,7 @@ RUN ./mage build:manager
 
 USER default
 
-#9.0.0-21
-FROM registry.access.redhat.com/ubi9-micro@sha256:2c97b1e127c01e33d9aee7da124a55a51ad8cdc634cf674ea3f6f69995ea3b65
+FROM registry.access.redhat.com/ubi8-micro:latest
 
 COPY --from=builder /workspace/bin/linux_amd64/reference-addon-manager .
 

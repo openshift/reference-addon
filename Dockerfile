@@ -6,10 +6,6 @@ COPY go.mod .
 COPY go.sum .
 RUN go mod download
 
-# tools cache optimization
-COPY tools/ tools/
-RUN cd tools && go mod download
-
 # build manager binary
 COPY . .
 RUN ./mage build:manager

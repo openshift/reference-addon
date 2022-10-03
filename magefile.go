@@ -55,7 +55,6 @@ func (All) Lint(ctx context.Context) {
 		ctx,
 		All.Generate,
 		Check.Tidy,
-		Check.Verify,
 		Check.Lint,
 		Check.Dirty,
 	)

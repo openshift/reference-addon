@@ -87,7 +87,7 @@ func (c *PhaseApplyNetworkPoliciesConfig) Option(opts ...PhaseApplyNetworkPolici
 }
 
 func (c *PhaseApplyNetworkPoliciesConfig) Default() {
-	if c.Log == nil {
+	if c.Log.GetSink() == nil {
 		c.Log = logr.Discard()
 	}
 }

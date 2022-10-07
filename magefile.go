@@ -76,7 +76,7 @@ func (All) Generate(ctx context.Context) {
 		ctx,
 		Generate.Manifests,
 		Generate.Boilerplate,
-		Generate.Deployment,
+		Generate.OperatorDeployment,
 		Generate.ClusterServiceVersion,
 	)
 }
@@ -773,12 +773,12 @@ func (Generate) Boilerplate(ctx context.Context) error {
 
 var controllerGen = command.NewCommandAlias(filepath.Join(_depBin, "controller-gen"))
 
-// Deployment applies templated values to
-// the manager Deployment.
-func (Generate) Deployment(ctx context.Context) {
+// OperatorDeployment applies templated values to
+// the manager OperatorDeployment.
+func (Generate) OperatorDeployment(ctx context.Context) {
 	var (
-		template = filepath.Join("config", "templates", "deployment.tpl.yaml")
-		out      = filepath.Join("config", "deploy", "deployment.yaml")
+		template = filepath.Join("config", "templates", "operator.tpl.yaml")
+		out      = filepath.Join("config", "deploy", "operator.yaml")
 	)
 
 	mg.CtxDeps(
@@ -793,7 +793,7 @@ func (Generate) Deployment(ctx context.Context) {
 // the operator ClusterServiceVersion.
 func (Generate) ClusterServiceVersion(ctx context.Context) {
 	var (
-		skipRange = ">0.0.0 <=" + strings.TrimPrefix(_version, "v")
+		skipRange = "<=" + strings.TrimPrefix(_version, "v")
 		template  = filepath.Join("config", "templates", "reference-addon.csv.tpl.yaml")
 		out       = filepath.Join("config", "deploy", "reference-addon.csv.yaml")
 	)

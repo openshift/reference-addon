@@ -1,10 +1,7 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"net/http"
-	"net/http/pprof"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -12,27 +9,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	"github.com/go-logr/logr"
 	refapis "github.com/openshift/reference-addon/apis"
 	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/openshift/reference-addon/internal/metrics"
+	"github.com/openshift/reference-addon/internal/pprof"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 )
-
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-)
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = refapis.AddToScheme(scheme)
-	_ = opsv1alpha1.AddToScheme(scheme)
-
-	// Register metrics with the global Prometheus registry
-	metrics.RegisterMetrics()
-}
 
 func main() {
 	opts := options{
@@ -42,16 +27,56 @@ func main() {
 		OperatorName:          "reference-addon",
 		ParameterSecretname:   "addon-reference-addon-parameters",
 		ProbeAddr:             ":8081",
+		Zap: zap.Options{
+			Development: true,
+		},
 	}
-
 	if err := opts.Process(); err != nil {
-		setupLog.Error(err, "processing options")
+		fmt.Fprintf(os.Stdout, "Unexpected error occurred while processing options: %v\n", err)
+
 		os.Exit(1)
 	}
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts.Zap)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	log := ctrl.Log.WithName("setup")
+
+	log.Info("Setting Up Manager")
+
+	mgr, err := setupManager(log, opts)
+	if err != nil {
+		fail(log, err, "setting up manager")
+	}
+
+	log.Info("Starting Manager")
+
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		fail(log, err, "running manager")
+	}
+}
+
+func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
+	log.Info("Registering Metrics")
+
+	if err := metrics.RegisterMetrics(ctrlmetrics.Registry); err != nil {
+		return nil, fmt.Errorf("registering metrics: %w", err)
+	}
+
+	log.Info("Setting Up Scheme")
+
+	scheme, err := initializeScheme()
+	if err != nil {
+		return nil, fmt.Errorf("initializing scheme: %w", err)
+	}
+
+	log.Info("Initializing Manager")
+
+	cfg, err := ctrl.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("getting config for cluster: %w", err)
+	}
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         opts.MetricsAddr,
 		HealthProbeBindAddress:     opts.ProbeAddr,
@@ -62,59 +87,28 @@ func main() {
 		Namespace:                  opts.Namespace,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	// -----
-	// PPROF
-	// -----
-	if len(opts.PprofAddr) > 0 {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
-		s := &http.Server{Addr: opts.PprofAddr, Handler: mux}
-		err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			errCh := make(chan error)
-			defer func() {
-				for range errCh {
-				} // drain errCh for GC
-			}()
-			go func() {
-				defer close(errCh)
-				errCh <- s.ListenAndServe()
-			}()
-
-			select {
-			case err := <-errCh:
-				return err
-			case <-ctx.Done():
-				s.Close()
-				return nil
-			}
-		}))
-		if err != nil {
-			setupLog.Error(err, "unable to create pprof server")
-			os.Exit(1)
-		}
+		return nil, fmt.Errorf("initializing manager: %w", err)
 	}
 
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
-		setupLog.Error(fmt.Errorf("unable to set up health check: %w", err), "setting up manager")
-		os.Exit(1)
+		return nil, fmt.Errorf("adding healthz check to manager: %w", err)
 	}
 	if err := mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
-		setupLog.Error(fmt.Errorf("unable to set up ready check: %w", err), "setting up manager")
-		os.Exit(1)
+		return nil, fmt.Errorf("adding readyz check to manager: %w", err)
 	}
+
+	if opts.PprofAddr != "" {
+		log.Info("Initializing Pprof")
+
+		if err := mgr.Add(pprof.NewServer(opts.PprofAddr)); err != nil {
+			return nil, fmt.Errorf("adding pprof server to manager: %w", err)
+		}
+	}
+
+	log.Info("Initializing Controllers")
 
 	client := mgr.GetClient()
 
-	// the following section hooks up a heartbeat reporter with the current addon/operator
 	r, err := controllers.NewReferenceAddonReconciler(
 		client,
 		controllers.NewSecretParameterGetter(
@@ -122,29 +116,43 @@ func main() {
 			controllers.WithNamespace(opts.Namespace),
 			controllers.WithName(opts.ParameterSecretname),
 		),
-		controllers.WithLog{Log: ctrl.Log.WithName("controllers").WithName("ReferenceAddon")},
+		controllers.WithLog{Log: ctrl.Log.WithName("controller").WithName("referenceaddon")},
 		controllers.WithAddonNamespace(opts.Namespace),
 		controllers.WithAddonParameterSecretName(opts.ParameterSecretname),
 		controllers.WithOperatorName(opts.OperatorName),
 		controllers.WithDeleteLabel(opts.DeleteLabel),
 	)
 	if err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ReferenceAddon")
-		os.Exit(1)
+		return nil, fmt.Errorf("initializing reference addon controller: %w", err)
 	}
 
 	if err := r.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to setup controller", "controller", "ReferenceAddon")
-		os.Exit(1)
+		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
 	}
 
-	// ensure at least one data point for sample metrics
-	sampler := metrics.NewResponseSamplerImpl()
-	sampler.RequestSampleResponseData("https://httpstat.us/503", "https://httpstat.us/200")
+	return mgr, nil
+}
 
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
-		os.Exit(1)
+func initializeScheme() (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("adding client-go APIs to scheme: %w", err)
 	}
+
+	if err := refapis.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("adding Reference Addon APIs to scheme: %w", err)
+	}
+
+	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("adding Operators v1alpha1 APIs to scheme :%w", err)
+	}
+
+	return scheme, nil
+}
+
+func fail(log logr.Logger, err error, msg string) {
+	log.Error(err, msg)
+
+	os.Exit(1)
 }

@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 type options struct {
@@ -17,6 +19,7 @@ type options struct {
 	ParameterSecretname   string
 	PprofAddr             string
 	ProbeAddr             string
+	Zap                   zap.Options
 }
 
 func (o *options) Process() error {
@@ -27,14 +30,16 @@ func (o *options) Process() error {
 }
 
 func (o *options) processFlags() {
-	flag.StringVar(
+	flags := flag.CommandLine
+
+	flags.StringVar(
 		&o.DeleteLabel,
 		"delete-label",
 		o.DeleteLabel,
 		"Label applied to addon ConfigMap to trigger deletion.",
 	)
 
-	flag.BoolVar(
+	flags.BoolVar(
 		&o.EnableLeaderElection,
 		"enable-leader-election",
 		o.EnableLeaderElection,
@@ -42,54 +47,56 @@ func (o *options) processFlags() {
 			"Enabling this will ensure there is only one active controller manager.",
 	)
 
-	flag.BoolVar(
+	flags.BoolVar(
 		&o.EnableMetricsRecorder,
 		"enable-metrics-recorder",
 		o.EnableMetricsRecorder,
 		"Enable recording Addon Metrics.",
 	)
 
-	flag.StringVar(
+	flags.StringVar(
 		&o.MetricsAddr,
 		"metrics-addr",
 		o.MetricsAddr,
 		"The address the metric endpoint binds to.",
 	)
 
-	flag.StringVar(
+	flags.StringVar(
 		&o.Namespace,
 		"namespace",
 		o.Namespace,
 		"The namepsace in which the operator will run.",
 	)
 
-	flag.StringVar(
+	flags.StringVar(
 		&o.OperatorName,
 		"operator-name",
 		o.OperatorName,
 		"The operator's Bundle name.",
 	)
 
-	flag.StringVar(
+	flags.StringVar(
 		&o.ParameterSecretname,
 		"parameter-secret-name",
 		o.ParameterSecretname,
 		"The name of the Secret where addon parameters can be retrieved.",
 	)
 
-	flag.StringVar(
+	flags.StringVar(
 		&o.PprofAddr,
 		"pprof-addr",
 		o.PprofAddr,
 		"The address the pprof web endpoint binds to.",
 	)
 
-	flag.StringVar(
+	flags.StringVar(
 		&o.ProbeAddr,
 		"health-probe-bind-address",
 		o.ProbeAddr,
 		"The address the probe endpoint binds to.",
 	)
+
+	o.Zap.BindFlags(flags)
 
 	flag.Parse()
 }

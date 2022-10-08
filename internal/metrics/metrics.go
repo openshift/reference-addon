@@ -1,12 +1,24 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
+
+func RegisterMetrics(reg prometheus.Registerer) error {
+	if err := reg.Register(availability); err != nil {
+		return fmt.Errorf("registering 'availability' metric: %w", err)
+	}
+
+	if err := reg.Register(responseTime); err != nil {
+		return fmt.Errorf("registering 'responseTime' metric: %w", err)
+	}
+
+	return nil
+}
 
 var (
 	availability = prometheus.NewGaugeVec(
@@ -24,12 +36,6 @@ var (
 		[]string{"url"},
 	)
 )
-
-// RegisterMetrics must register metrics in given registry collector
-func RegisterMetrics() {
-	ctrlmetrics.Registry.MustRegister(availability)
-	ctrlmetrics.Registry.MustRegister(responseTime)
-}
 
 func NewResponseSamplerImpl() *ResponseSamplerImpl {
 	return &ResponseSamplerImpl{}

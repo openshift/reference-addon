@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/mt-sre/go-ci/command"
 	"github.com/mt-sre/go-ci/container"
 	"github.com/mt-sre/go-ci/web"
+	"github.com/mt-sre/go-ci/git"
 )
 
 var Aliases = map[string]interface{}{
@@ -96,13 +96,14 @@ var _projectRoot = func() string {
 		return root
 	}
 
-	topLevel := git(command.WithArgs{"rev-parse", "--show-toplevel"})
-
-	if err := topLevel.Run(); err != nil || !topLevel.Success() {
-		panic("failed to get working directory")
+	root, err := git.RevParse(context.Background(),
+		git.WithRevParseFormat(git.RevParseFormatTopLevel),
+	)
+	if err != nil {
+		panic(err)
 	}
 
-	return strings.TrimSpace(topLevel.Stdout())
+	return root
 }()
 
 var _module = func() string {
@@ -128,55 +129,38 @@ var _version = func() string {
 		return bundleVersion
 	}
 
-	listTags := git(command.WithArgs{"tag", "-l"})
-
-	if err := listTags.Run(); err != nil || !listTags.Success() {
-		panic("failed to get tags")
-	}
-
-	tags := strings.Fields(listTags.Stdout())
-	if len(tags) < 1 {
-		return zeroVer
-	}
-
-	latest := tags[len(tags)-1]
-
-	commitCount := git(command.WithArgs{"rev-list", latest + "..", "--count"})
-
-	if err := commitCount.Run(); err != nil || !commitCount.Success() {
-		return zeroVer
-	}
-
-	count, err := strconv.Atoi(strings.TrimSpace(commitCount.Stdout()))
+	latest, err := git.LatestVersion(context.Background())
 	if err != nil {
-		return zeroVer
+		if errors.Is(err, git.ErrNoTagsFound) {
+			return zeroVer
+		}
+
+		panic(err)
 	}
 
-	if count < 1 {
-		return latest
-	}
-
-	return fmt.Sprintf("%s-%d", latest, count)
+	return latest+"-"+_shortSHA
 }()
 
 var _branch = func() string {
-	branch := git(command.WithArgs{"rev-parse", "--abbrev-ref", "HEAD"})
-
-	if err := branch.Run(); err != nil || !branch.Success() {
-		panic("failed to get current branch")
+	branch, err := git.RevParse(context.Background(),
+		git.WithRevParseFormat(git.RevParseFormatAbbrevRef),
+	)
+	if err != nil {
+		panic(err)
 	}
 
-	return strings.TrimSpace(branch.Stdout())
+	return branch
 }()
 
 var _shortSHA = func() string {
-	sha := git(command.WithArgs{"rev-parse", "--short", "HEAD"})
-
-	if err := sha.Run(); err != nil || !sha.Success() {
-		panic("failed to get short SHA")
+	short, err := git.RevParse(context.Background(),
+		git.WithRevParseFormat(git.RevParseFormatShort),
+	)
+	if err != nil {
+		panic(err)
 	}
 
-	return strings.TrimSpace(sha.Stdout())
+	return short
 }()
 
 var _taggedManagerImage = _managerImageReference + ":" + _version
@@ -188,8 +172,6 @@ var _managerImageReference = func() string {
 
 	return "quay.io/app-sre/reference-addon-manager"
 }()
-
-var git = command.NewCommandAlias("git")
 
 type Deps mg.Namespace
 
@@ -559,44 +541,25 @@ func (Check) Verify(ctx context.Context) error {
 // Dirty checks if the git repository has
 // uncommitted changes.
 func (Check) Dirty(ctx context.Context) error {
-	status := git(
-		command.WithArgs{"status", "--porcelain"},
+	status, err := git.Status(ctx,
+		git.WithStatusFormat(git.StatusFormatPorcelain),
 	)
-
-	if err := status.Run(); err != nil {
-		return fmt.Errorf("starting to check git status: %w", err)
+	if err != nil {
+		return fmt.Errorf("getting git status: %w", err)
 	}
 
-	if !status.Success() {
-		return fmt.Errorf("checking git status: %w", status.Error())
+	if status == "" {
+		return nil
 	}
 
-	if out := status.Stdout(); out != "" {
-		if diff, err := getDiff(ctx); err == nil {
-			fmt.Fprintln(os.Stdout, diff)
-		}
-
-		return errors.New("repo is dirty")
-	}
-
-	return nil
-}
-
-func getDiff(ctx context.Context) (string, error) {
-	diff := git(
-		command.WithContext{Context: ctx},
-		command.WithArgs{"diff", "--name-status"},
+	diff, err := git.Diff(ctx,
+		git.WithDiffFormat(git.DiffFormatNameStatus),
 	)
-
-	if err := diff.Run(); err != nil {
-		return "", fmt.Errorf("starting to get diff: %w", err)
+	if err == nil {
+		fmt.Fprintln(os.Stdout, diff)
 	}
 
-	if !diff.Success() {
-		return "", fmt.Errorf("getting diff: %w", diff.Error())
-	}
-
-	return strings.TrimSpace(diff.Stdout()), nil
+	return errors.New("repo is dirty")
 }
 
 type Test mg.Namespace

@@ -5,9 +5,9 @@ go 1.17
 require (
 	github.com/go-logr/logr v0.4.0
 	github.com/magefile/mage v1.14.0
-	github.com/mt-sre/go-ci v0.4.0
+	github.com/mt-sre/go-ci v0.6.1
 	github.com/onsi/ginkgo/v2 v2.2.0
-	github.com/onsi/gomega v1.20.1
+	github.com/onsi/gomega v1.21.1
 	github.com/operator-framework/api v0.10.7
 	github.com/prometheus/client_golang v1.11.0
 	github.com/stretchr/testify v1.8.0

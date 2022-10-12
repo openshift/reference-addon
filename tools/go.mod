@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/golangci/golangci-lint v1.43.0
 	github.com/mikefarah/yq/v4 v4.27.5
-	github.com/onsi/ginkgo/v2 v2.2.0
+	github.com/onsi/ginkgo/v2 v2.3.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf
 	sigs.k8s.io/controller-tools v0.8.0
 )

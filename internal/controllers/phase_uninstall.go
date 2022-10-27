@@ -65,7 +65,7 @@ func (c *PhaseUninstallConfig) Option(opts ...PhaseUninstallOption) {
 }
 
 func (c *PhaseUninstallConfig) Default() {
-	if c.Log == nil {
+	if c.Log.GetSink() == nil {
 		c.Log = logr.Discard()
 	}
 }
@@ -124,7 +124,7 @@ func (c *UninstallerImplConfig) Option(opts ...UninstallerImplOption) {
 }
 
 func (c *UninstallerImplConfig) Default() {
-	if c.Log == nil {
+	if c.Log.GetSink() == nil {
 		c.Log = logr.Discard()
 	}
 }
@@ -231,7 +231,7 @@ func (c *CSVClientImplConfig) Option(opts ...CSVClientOption) {
 }
 
 func (c *CSVClientImplConfig) Default() {
-	if c.Log == nil {
+	if c.Log.GetSink() == nil {
 		c.Log = logr.Discard()
 	}
 }

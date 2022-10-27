@@ -58,7 +58,7 @@ func (c *PhaseSimulateReconciliationConfig) Option(opts ...PhaseSimulateReconcil
 }
 
 func (c *PhaseSimulateReconciliationConfig) Default() {
-	if c.Log == nil {
+	if c.Log.GetSink() == nil {
 		c.Log = logr.Discard()
 	}
 }

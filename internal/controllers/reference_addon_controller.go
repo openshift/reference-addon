@@ -184,7 +184,7 @@ func (c *ReferenceAddonReconcilerConfig) Option(opts ...ReferenceAddonReconciler
 }
 
 func (c *ReferenceAddonReconcilerConfig) Default() {
-	if c.Log == nil {
+	if c.Log.GetSink() == nil {
 		c.Log = logr.Discard()
 	}
 }

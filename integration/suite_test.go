@@ -69,8 +69,8 @@ var _ = BeforeSuite(func() {
 	By("Installing CRD's")
 
 	_, err = envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{
-		CRDs: []v1.CustomResourceDefinition{
-			*olmcrds.ClusterServiceVersion(),
+		CRDs: []*v1.CustomResourceDefinition{
+			olmcrds.ClusterServiceVersion(),
 		},
 		Paths: []string{
 			filepath.Join(root, "config", "deploy", "reference.addons.managed.openshift.io_referenceaddons.yaml"),

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -18,8 +19,8 @@ import (
 	"github.com/magefile/mage/sh"
 	"github.com/mt-sre/go-ci/command"
 	"github.com/mt-sre/go-ci/container"
-	"github.com/mt-sre/go-ci/web"
 	"github.com/mt-sre/go-ci/git"
+	"github.com/mt-sre/go-ci/web"
 )
 
 var Aliases = map[string]interface{}{
@@ -166,12 +167,23 @@ var _shortSHA = func() string {
 var _taggedManagerImage = _managerImageReference + ":" + _version
 
 var _managerImageReference = func() string {
-	if ref, ok := os.LookupEnv("MANAGER_IMAGE_REF"); ok {
-		return ref
+	org := defaultOrg
+	if val, ok := os.LookupEnv("IMAGE_ORG"); ok {
+		org = val
 	}
 
-	return "quay.io/app-sre/reference-addon-manager"
+	repo:= defaultRepo
+	if val, ok := os.LookupEnv("IMAGE_REPO"); ok {
+		repo = val
+	}
+
+	return path.Join(org, repo)
 }()
+
+const (
+	defaultOrg  = "quay.io/app-sre"
+	defaultRepo = "reference-addon-manager"
+)
 
 type Deps mg.Namespace
 
@@ -432,8 +444,8 @@ func buildImage(ctx context.Context, file, ref, dir string) error {
 type Release mg.Namespace
 
 // ManagerImage pushes the manager container image to the target repo.
-// The target repo can be modified by setting the environment variable
-// "MANAGER_IMAGE_REF" to a valid location.
+// The target image can be modified by setting the environment variables
+// IMAGE_ORG and IMAGE_REPO.
 func (Release) ManagerImage(ctx context.Context) {
 	mg.SerialCtxDeps(
 		ctx,
@@ -552,12 +564,7 @@ func (Check) Dirty(ctx context.Context) error {
 		return nil
 	}
 
-	diff, err := git.Diff(ctx,
-		git.WithDiffFormat(git.DiffFormatNameStatus),
-	)
-	if err == nil {
-		fmt.Fprintln(os.Stdout, diff)
-	}
+	fmt.Fprintln(os.Stdout, status)
 
 	return errors.New("repo is dirty")
 }
@@ -740,8 +747,8 @@ var controllerGen = command.NewCommandAlias(filepath.Join(_depBin, "controller-g
 // the manager OperatorDeployment.
 func (Generate) OperatorDeployment(ctx context.Context) {
 	var (
-		template = filepath.Join("config", "templates", "operator.tpl.yaml")
-		out      = filepath.Join("config", "deploy", "operator.yaml")
+		template = filepath.Join(_projectRoot, "config", "templates", "operator.tpl.yaml")
+		out      = filepath.Join(_projectRoot, "config", "deploy", "operator.yaml")
 	)
 
 	mg.CtxDeps(
@@ -757,8 +764,8 @@ func (Generate) OperatorDeployment(ctx context.Context) {
 func (Generate) ClusterServiceVersion(ctx context.Context) {
 	var (
 		skipRange = "<=" + strings.TrimPrefix(_version, "v")
-		template  = filepath.Join("config", "templates", "reference-addon.csv.tpl.yaml")
-		out       = filepath.Join("config", "deploy", "reference-addon.csv.yaml")
+		template  = filepath.Join(_projectRoot, "config", "templates", "reference-addon.csv.tpl.yaml")
+		out       = filepath.Join(_projectRoot, "config", "deploy", "reference-addon.csv.yaml")
 	)
 
 	mg.CtxDeps(
@@ -841,28 +848,12 @@ var operatorSDK = command.NewCommandAlias(filepath.Join(_depBin, "operator-sdk")
 
 // Clean removes left over bundle artifacts.
 func (Release) Clean() error {
-	if err := remove(filepath.Join(_projectRoot, "bundle.Dockerfile")); err != nil {
+	if err := sh.Rm(filepath.Join(_projectRoot, "bundle.Dockerfile")); err != nil {
 		return fmt.Errorf("removing 'bundle.Dockerfile': %w", err)
 	}
 
-	if err := removeAll(filepath.Join(_projectRoot, "bundle")); err != nil {
+	if err := sh.Rm(filepath.Join(_projectRoot, "bundle")); err != nil {
 		return fmt.Errorf("removing bundle directory: %w", err)
-	}
-
-	return nil
-}
-
-func remove(path string) error {
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	return nil
-}
-
-func removeAll(path string) error {
-	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
-		return err
 	}
 
 	return nil

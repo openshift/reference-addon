@@ -7,7 +7,7 @@ require (
 	github.com/mikefarah/yq/v4 v4.28.2
 	github.com/onsi/ginkgo/v2 v2.4.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf
-	sigs.k8s.io/controller-tools v0.9.2
+	sigs.k8s.io/controller-tools v0.10.0
 )
 
 require (
@@ -172,16 +172,16 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.2.1 // indirect
-	k8s.io/api v0.24.0 // indirect
-	k8s.io/apiextensions-apiserver v0.24.0 // indirect
-	k8s.io/apimachinery v0.24.0 // indirect
-	k8s.io/klog/v2 v2.60.1 // indirect
-	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
+	k8s.io/api v0.25.0 // indirect
+	k8s.io/apiextensions-apiserver v0.25.0 // indirect
+	k8s.io/apimachinery v0.25.0 // indirect
+	k8s.io/klog/v2 v2.70.1 // indirect
+	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
 	mvdan.cc/gofumpt v0.1.1 // indirect
 	mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed // indirect
 	mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b // indirect
 	mvdan.cc/unparam v0.0.0-20210104141923-aac4ce9116a7 // indirect
-	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
+	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )

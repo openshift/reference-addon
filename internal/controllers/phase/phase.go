@@ -3,7 +3,8 @@ package phase
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
+	refv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Phase interface {
@@ -11,7 +12,7 @@ type Phase interface {
 }
 
 type Request struct {
-	Object types.NamespacedName
+	Addon  refv1alpha1.ReferenceAddon
 	Params RequestParameters
 }
 
@@ -74,46 +75,61 @@ type RequestParametersOption interface {
 	ConfigureRequestParameters(*RequestParametersConfig)
 }
 
-func Success() Result {
+func Success(opts ...ResultOption) Result {
+	var cfg ResultConfig
+
+	cfg.Option(opts...)
+
 	return Result{
+		cfg:    cfg,
 		status: StatusSuccess,
 	}
 }
 
-func Blocking() Result {
+func Blocking(opts ...ResultOption) Result {
+	var cfg ResultConfig
+
+	cfg.Option(opts...)
+
 	return Result{
-		status:   StatusSuccess,
-		blocking: true,
+		cfg:    cfg,
+		status: StatusBlocking,
 	}
 }
 
-func Failure(msg string) Result {
+func Failure(msg string, opts ...ResultOption) Result {
+	var cfg ResultConfig
+
+	cfg.Option(opts...)
+
 	return Result{
+		cfg:        cfg,
 		status:     StatusFailure,
 		failureMsg: msg,
 	}
 }
 
-func Error(err error) Result {
+func Error(err error, opts ...ResultOption) Result {
+	var cfg ResultConfig
+
+	cfg.Option(opts...)
+
 	return Result{
+		cfg:    cfg,
 		status: StatusError,
 		err:    err,
 	}
 }
 
 type Result struct {
+	cfg        ResultConfig
 	err        error
 	failureMsg string
 	status     Status
-	blocking   bool
 }
 
-func (r Result) IsSuccess() bool {
-	return r.status == StatusSuccess
-}
-
-func (r Result) IsBlocking() bool {
-	return r.blocking
+func (r Result) Status() Status {
+	return r.status
 }
 
 func (r Result) FailureMessage() string {
@@ -124,10 +140,39 @@ func (r Result) Error() error {
 	return r.err
 }
 
+func (r Result) Conditions() []metav1.Condition {
+	return r.cfg.Conditions
+}
+
 type Status string
 
+func (s Status) String() string {
+	return string(s)
+}
+
 const (
-	StatusSuccess = "success"
-	StatusFailure = "failure"
-	StatusError   = "error"
+	StatusBlocking Status = "blocking"
+	StatusError    Status = "error"
+	StatusFailure  Status = "failure"
+	StatusSuccess  Status = "success"
 )
+
+type ResultConfig struct {
+	Conditions []metav1.Condition
+}
+
+func (c *ResultConfig) Option(opts ...ResultOption) {
+	for _, opt := range opts {
+		opt.ConfigureResult(c)
+	}
+}
+
+type ResultOption interface {
+	ConfigureResult(c *ResultConfig)
+}
+
+type WithConditions []metav1.Condition
+
+func (w WithConditions) ConfigureResult(c *ResultConfig) {
+	c.Conditions = append(c.Conditions, w...)
+}

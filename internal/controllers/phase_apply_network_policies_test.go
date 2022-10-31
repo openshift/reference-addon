@@ -66,21 +66,23 @@ func TestPhaseApplyNetworkPolicies(t *testing.T) {
 
 			var m NetworkPolicyClientMock
 
-			argList := make([]interface{}, 0, 1+len(tc.Policies))
-
-			argList = append(argList, mock.Anything)
-
-			for _, p := range tc.Policies {
-				argList = append(argList, p)
-			}
-
 			switch val := tc.ApplyNetworkPolicy; {
 			case val == nil:
 			case *val == true:
+				argList := []interface{}{mock.Anything, mock.Anything, WithPolicies(tc.Policies)}
+
 				m.
 					On("ApplyNetworkPolicies", argList...).
 					Return(nil)
 			case *val == false:
+				argList := make([]interface{}, 0, 1+len(tc.Policies))
+
+				argList = append(argList, mock.Anything)
+
+				for _, p := range tc.Policies {
+					argList = append(argList, p)
+				}
+
 				m.
 					On("RemoveNetworkPolicies", argList...).
 					Return(nil)
@@ -98,7 +100,7 @@ func TestPhaseApplyNetworkPolicies(t *testing.T) {
 			})
 			require.NoError(t, res.Error())
 
-			assert.True(t, res.IsSuccess())
+			assert.Equal(t, phase.StatusSuccess, res.Status())
 
 			m.AssertExpectations(t)
 		})
@@ -109,13 +111,13 @@ type NetworkPolicyClientMock struct {
 	mock.Mock
 }
 
-func (m *NetworkPolicyClientMock) ApplyNetworkPolicies(ctx context.Context, policies ...netv1.NetworkPolicy) error {
-	argList := make([]interface{}, 0, 1+len(policies))
+func (m *NetworkPolicyClientMock) ApplyNetworkPolicies(ctx context.Context, opts ...ApplyNetorkPoliciesOption) error {
+	argList := make([]interface{}, 0, 1+len(opts))
 
 	argList = append(argList, ctx)
 
-	for _, p := range policies {
-		argList = append(argList, p)
+	for _, o := range opts {
+		argList = append(argList, o)
 	}
 
 	args := m.Called(argList...)
@@ -241,7 +243,7 @@ func TestNetworkPolicyClientImpl_ApplyNetworkPolicies(t *testing.T) {
 
 			require.NoError(t, npClient.ApplyNetworkPolicies(
 				context.Background(),
-				tc.DesiredPolicies...,
+				WithPolicies(tc.DesiredPolicies),
 			),
 			)
 

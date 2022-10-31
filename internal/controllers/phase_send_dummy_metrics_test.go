@@ -47,7 +47,7 @@ func TestPhaseSendDummyMetrics(t *testing.T) {
 			res := p.Execute(context.Background(), phase.Request{})
 			require.NoError(t, res.Error())
 
-			assert.True(t, res.IsSuccess())
+			assert.Equal(t, phase.StatusSuccess, res.Status())
 		})
 	}
 }

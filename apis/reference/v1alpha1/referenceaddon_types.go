@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -14,6 +15,39 @@ type ReferenceAddonStatus struct {
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
+type ReferenceAddonCondition string
+
+func (c ReferenceAddonCondition) String() string {
+	return string(c)
+}
+
+const (
+	ReferenceAddonConditionAvailable ReferenceAddonCondition = "Available"
+)
+
+type ReferenceAddonAvailableReason string
+
+func (r ReferenceAddonAvailableReason) String() string {
+	return string(r)
+}
+
+func (r ReferenceAddonAvailableReason) Status() metav1.ConditionStatus {
+	switch r {
+	case ReferenceAddonAvailableReasonReady:
+		return "True"
+	case ReferenceAddonAvailableReasonPending:
+		return "False"
+	default:
+		return "Unknown"
+	}
+}
+
+const (
+	ReferenceAddonAvailableReasonReady        ReferenceAddonAvailableReason = "Ready"
+	ReferenceAddonAvailableReasonPending      ReferenceAddonAvailableReason = "Pending"
+	ReferenceAddonAvailableReasonUninstalling ReferenceAddonAvailableReason = "Uninstalling"
+)
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -23,6 +57,12 @@ type ReferenceAddon struct {
 
 	Spec   ReferenceAddonSpec   `json:"spec,omitempty"`
 	Status ReferenceAddonStatus `json:"status,omitempty"`
+}
+
+func (a *ReferenceAddon) HasConditionAvailable() bool {
+	condT := ReferenceAddonConditionAvailable.String()
+
+	return meta.FindStatusCondition(a.Status.Conditions, condT) != nil
 }
 
 // ReferenceAddonList contains a list of ReferenceAddons

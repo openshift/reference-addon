@@ -47,7 +47,7 @@ func (p *PhaseApplyNetworkPolicies) Execute(ctx context.Context, req phase.Reque
 		return p.ensureNetworkPoliciesRemoved(ctx)
 	}
 
-	return p.ensureNetworkPoliciesApplied(ctx)
+	return p.ensureNetworkPoliciesApplied(ctx, req)
 }
 
 func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesRemoved(ctx context.Context) phase.Result {
@@ -62,10 +62,10 @@ func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesRemoved(ctx context.Con
 	return phase.Success()
 }
 
-func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesApplied(ctx context.Context) phase.Result {
+func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesApplied(ctx context.Context, req phase.Request) phase.Result {
 	p.cfg.Log.Info("applying NetworkPolicies", "count", len(p.cfg.Policies))
 
-	if err := p.client.ApplyNetworkPolicies(ctx, p.cfg.Policies...); err != nil {
+	if err := p.client.ApplyNetworkPolicies(ctx, WithOwner{Owner: &req.Addon}, WithPolicies(p.cfg.Policies)); err != nil {
 		return phase.Error(fmt.Errorf("applying NetworkPolicies: %w", err))
 	}
 
@@ -97,7 +97,7 @@ type PhaseApplyNetworkPoliciesOption interface {
 }
 
 type NetworkPolicyClient interface {
-	ApplyNetworkPolicies(ctx context.Context, policies ...netv1.NetworkPolicy) error
+	ApplyNetworkPolicies(ctx context.Context, opts ...ApplyNetorkPoliciesOption) error
 	RemoveNetworkPolicies(ctx context.Context, policies ...netv1.NetworkPolicy) error
 }
 
@@ -111,19 +111,44 @@ type NetworkPolicyClientImpl struct {
 	client client.Client
 }
 
-func (c *NetworkPolicyClientImpl) ApplyNetworkPolicies(ctx context.Context, policies ...netv1.NetworkPolicy) error {
+func (c *NetworkPolicyClientImpl) ApplyNetworkPolicies(ctx context.Context, opts ...ApplyNetorkPoliciesOption) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	var cfg ApplyNetorkPoliciesConfig
+
+	cfg.Option(opts...)
+
 	var finalErr error
 
-	for _, policy := range policies {
+	for _, policy := range cfg.Policies {
+		if cfg.Owner != nil {
+			if err := ctrl.SetControllerReference(cfg.Owner, &policy, c.client.Scheme()); err != nil {
+				return fmt.Errorf("setting controller reference: %w", err)
+			}
+		}
+
 		if err := c.createOrUpdatePolicy(ctx, policy); err != nil {
 			multierr.AppendInto(&finalErr, fmt.Errorf("creating/updating NetworkPolicy %q: %w", policy.Name, err))
 		}
 	}
 
 	return finalErr
+}
+
+type ApplyNetorkPoliciesConfig struct {
+	Owner    metav1.Object
+	Policies []netv1.NetworkPolicy
+}
+
+func (c *ApplyNetorkPoliciesConfig) Option(opts ...ApplyNetorkPoliciesOption) {
+	for _, opt := range opts {
+		opt.ConfigureApplyNetworkPolicies(c)
+	}
+}
+
+type ApplyNetorkPoliciesOption interface {
+	ConfigureApplyNetworkPolicies(c *ApplyNetorkPoliciesConfig)
 }
 
 func (c *NetworkPolicyClientImpl) createOrUpdatePolicy(ctx context.Context, policy netv1.NetworkPolicy) error {
@@ -136,6 +161,7 @@ func (c *NetworkPolicyClientImpl) createOrUpdatePolicy(ctx context.Context, poli
 
 	_, err := ctrl.CreateOrUpdate(ctx, c.client, actualPolicy, func() error {
 		actualPolicy.Labels = labels.Merge(actualPolicy.Labels, policy.Labels)
+		actualPolicy.OwnerReferences = policy.OwnerReferences
 		actualPolicy.Spec = policy.Spec
 
 		return nil

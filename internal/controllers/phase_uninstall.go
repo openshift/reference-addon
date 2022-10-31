@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	refv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
 	"github.com/openshift/reference-addon/internal/controllers/phase"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"go.uber.org/multierr"
@@ -48,7 +49,14 @@ func (p *PhaseUninstall) Execute(ctx context.Context, req phase.Request) phase.R
 		return phase.Error(fmt.Errorf("uninstalling addon: %w", err))
 	}
 
-	return phase.Blocking()
+	return phase.Blocking(
+		phase.WithConditions{
+			newAvailableCondition(
+				refv1alpha1.ReferenceAddonAvailableReasonUninstalling,
+				"uninstallation started",
+			),
+		},
+	)
 }
 
 type PhaseUninstallConfig struct {

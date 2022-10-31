@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/go-logr/logr"
 	netv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type WithLog struct{ Log logr.Logger }
@@ -12,10 +13,6 @@ func (w WithLog) ConfigureReferenceAddonReconciler(c *ReferenceAddonReconcilerCo
 }
 
 func (w WithLog) ConfigurePhaseApplyNetworkPolicies(c *PhaseApplyNetworkPoliciesConfig) {
-	c.Log = w.Log
-}
-
-func (w WithLog) ConfigurePhaseSimulateReconciliation(c *PhaseSimulateReconciliationConfig) {
 	c.Log = w.Log
 }
 
@@ -91,10 +88,20 @@ func (w WithNamespace) ConfigureListCSVs(c *ListCSVsConfig) {
 	c.Namespace = string(w)
 }
 
+type WithOwner struct{ Owner metav1.Object }
+
+func (w WithOwner) ConfigureApplyNetworkPolicies(c *ApplyNetorkPoliciesConfig) {
+	c.Owner = w.Owner
+}
+
 type WithPolicies []netv1.NetworkPolicy
 
 func (w WithPolicies) ConfigurePhaseApplyNetworkPolicies(c *PhaseApplyNetworkPoliciesConfig) {
-	c.Policies = []netv1.NetworkPolicy(w)
+	c.Policies = append(c.Policies, w...)
+}
+
+func (w WithPolicies) ConfigureApplyNetworkPolicies(c *ApplyNetorkPoliciesConfig) {
+	c.Policies = append(c.Policies, w...)
 }
 
 type WithPrefix string

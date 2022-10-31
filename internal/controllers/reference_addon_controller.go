@@ -3,23 +3,25 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	refapisv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
+	refv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
 	"github.com/openshift/reference-addon/internal/controllers/phase"
 	"github.com/openshift/reference-addon/internal/metrics"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, opts ...ReferenceAddonReconcilerOption) (*ReferenceAddonReconciler, error) {
@@ -39,15 +41,15 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 	}
 
 	var (
-		phaseLog                       = cfg.Log.WithName("phase")
-		phaseApplyNetworkPoliciesLog   = phaseLog.WithName("applyNetworkPolicies")
-		phaseSimulateReconciliationLog = phaseLog.WithName("simulateReconciliation")
-		phaseUninstallLog              = phaseLog.WithName("uninstall")
-		uninstallerLog                 = phaseUninstallLog.WithName("uninstaller")
+		phaseLog                     = cfg.Log.WithName("phase")
+		phaseApplyNetworkPoliciesLog = phaseLog.WithName("applyNetworkPolicies")
+		phaseUninstallLog            = phaseLog.WithName("uninstall")
+		uninstallerLog               = phaseUninstallLog.WithName("uninstaller")
 	)
 
 	return &ReferenceAddonReconciler{
 		cfg:         cfg,
+		client:      NewReferenceAddonClient(client),
 		paramGetter: getter,
 		orderedPhases: []phase.Phase{
 			NewPhaseUninstall(
@@ -62,9 +64,6 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 				WithLog{Log: phaseUninstallLog},
 				WithAddonNamespace(cfg.AddonNamespace),
 				WithOperatorName(cfg.OperatorName),
-			),
-			NewPhaseSimulateReconciliation(
-				WithLog{Log: phaseSimulateReconciliationLog},
 			),
 			NewPhaseSendDummyMetrics(
 				metrics.NewResponseSamplerImpl(),
@@ -95,6 +94,7 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 type ReferenceAddonReconciler struct {
 	cfg ReferenceAddonReconcilerConfig
 
+	client      ReferenceAddonClient
 	paramGetter ParameterGetter
 
 	orderedPhases []phase.Phase
@@ -108,64 +108,120 @@ func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		r.cfg.Log.Error(err, "unable to sync addon parameters")
 	}
 
+	addon, err := r.ensureReferenceAddon(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensuring ReferenceAddon: %w", err)
+	}
+
+	defer func() {
+		if err := r.client.UpdateStatus(ctx, addon); err != nil {
+			r.cfg.Log.Error(err, "updating ReferenceAddon status")
+		}
+	}()
+
+	if !addon.HasConditionAvailable() {
+		meta.SetStatusCondition(
+			&addon.Status.Conditions,
+			newAvailableCondition(
+				refv1alpha1.ReferenceAddonAvailableReasonPending,
+				"starting reconciliation",
+			),
+		)
+	}
+
 	phaseReq := phase.Request{
-		Object: req.NamespacedName,
+		Addon:  *addon,
 		Params: params,
 	}
 
 	for _, p := range r.orderedPhases {
-		if res := p.Execute(ctx, phaseReq); res.Error() != nil {
+		res := p.Execute(ctx, phaseReq)
+
+		for _, cond := range res.Conditions() {
+			cond.ObservedGeneration = addon.Generation
+
+			meta.SetStatusCondition(&addon.Status.Conditions, cond)
+		}
+
+		switch res.Status() {
+		case phase.StatusError:
 			return ctrl.Result{}, res.Error()
-		} else if !res.IsSuccess() {
+		case phase.StatusFailure:
 			return ctrl.Result{Requeue: true}, nil
-		} else if res.IsBlocking() {
+		case phase.StatusBlocking:
 			return ctrl.Result{}, nil
 		}
 	}
 
+	meta.SetStatusCondition(&addon.Status.Conditions,
+		newAvailableCondition(
+			refv1alpha1.ReferenceAddonAvailableReasonReady,
+			"all reconcile phases completed successfully",
+		),
+	)
+
 	return ctrl.Result{}, nil
 }
 
+func (r *ReferenceAddonReconciler) ensureReferenceAddon(ctx context.Context) (*refv1alpha1.ReferenceAddon, error) {
+	actual, err := r.client.CreateOrUpdate(ctx, r.desiredReferenceAddon())
+	if err != nil {
+		return nil, fmt.Errorf("creating/updating desired ReferenceAddon: %w", err)
+	}
+
+	return actual, nil
+}
+
 func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	desired := r.desiredReferenceAddon()
+	requestObject := types.NamespacedName{
+		Name:      desired.Name,
+		Namespace: desired.Namespace,
+	}
+
+	refAddonHandler := handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
+		return []reconcile.Request{
+			{
+				NamespacedName: requestObject,
+			},
+		}
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&refapisv1alpha1.ReferenceAddon{}).
+		For(&refv1alpha1.ReferenceAddon{}).
+		Watches(
+			enqueueObject(requestObject),
+			refAddonHandler,
+		).
+		Owns(
+			&netv1.NetworkPolicy{},
+			builder.WithPredicates(hasName(generateIngressPolicyName(r.cfg.OperatorName))),
+		).
 		Watches(
 			&source.Kind{Type: &opsv1alpha1.ClusterServiceVersion{}},
-			&handler.EnqueueRequestForObject{},
+			refAddonHandler,
 			builder.WithPredicates(hasNamePrefix(r.cfg.OperatorName)),
 		).
 		Watches(
 			&source.Kind{Type: &corev1.ConfigMap{}},
-			&handler.EnqueueRequestForObject{},
+			refAddonHandler,
 			builder.WithPredicates(hasName(r.cfg.OperatorName)),
 		).
 		Watches(
 			&source.Kind{Type: &corev1.Secret{}},
-			&handler.EnqueueRequestForObject{},
+			refAddonHandler,
 			builder.WithPredicates(hasName(r.cfg.AddonParameterSecretname)),
-		).
-		Watches(
-			&source.Kind{Type: &netv1.NetworkPolicy{}},
-			&handler.EnqueueRequestForObject{},
-			builder.WithPredicates(hasName(generateIngressPolicyName(r.cfg.OperatorName))),
 		).
 		Complete(r)
 }
 
-func hasNamePrefix(pfx string) predicate.Funcs {
-	return predicate.NewPredicateFuncs(
-		func(obj client.Object) bool {
-			return strings.HasPrefix(obj.GetName(), pfx)
+func (r *ReferenceAddonReconciler) desiredReferenceAddon() refv1alpha1.ReferenceAddon {
+	return refv1alpha1.ReferenceAddon{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      r.cfg.OperatorName,
+			Namespace: r.cfg.AddonNamespace,
 		},
-	)
-}
-
-func hasName(name string) predicate.Funcs {
-	return predicate.NewPredicateFuncs(
-		func(obj client.Object) bool {
-			return obj.GetName() == name
-		},
-	)
+	}
 }
 
 type ReferenceAddonReconcilerConfig struct {
@@ -191,4 +247,47 @@ func (c *ReferenceAddonReconcilerConfig) Default() {
 
 type ReferenceAddonReconcilerOption interface {
 	ConfigureReferenceAddonReconciler(*ReferenceAddonReconcilerConfig)
+}
+
+type ReferenceAddonClient interface {
+	CreateOrUpdate(ctx context.Context, addon refv1alpha1.ReferenceAddon) (*refv1alpha1.ReferenceAddon, error)
+	UpdateStatus(ctx context.Context, addon *refv1alpha1.ReferenceAddon) error
+}
+
+func NewReferenceAddonClient(client client.Client) *ReferenceAddonClientImpl {
+	return &ReferenceAddonClientImpl{
+		client: client,
+	}
+}
+
+type ReferenceAddonClientImpl struct {
+	client client.Client
+}
+
+func (c *ReferenceAddonClientImpl) CreateOrUpdate(ctx context.Context, addon refv1alpha1.ReferenceAddon) (*refv1alpha1.ReferenceAddon, error) {
+	actualAddon := &refv1alpha1.ReferenceAddon{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      addon.Name,
+			Namespace: addon.Namespace,
+		},
+	}
+
+	if _, err := ctrl.CreateOrUpdate(ctx, c.client, actualAddon, func() error {
+		actualAddon.Labels = labels.Merge(actualAddon.Labels, addon.Labels)
+		actualAddon.Spec = addon.Spec
+
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("creating/updating ReferenceAddon: %w", err)
+	}
+
+	return actualAddon, nil
+}
+
+func (c *ReferenceAddonClientImpl) UpdateStatus(ctx context.Context, addon *refv1alpha1.ReferenceAddon) error {
+	if err := c.client.Status().Update(ctx, addon); err != nil {
+		return fmt.Errorf("updating ReferenceAddon status: %w", err)
+	}
+
+	return nil
 }

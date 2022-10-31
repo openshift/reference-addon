@@ -26,6 +26,8 @@ rules:
   - reference.addons.managed.openshift.io
   resources:
   - referenceaddons
+  - referenceaddons/status
+  - referenceaddons/finalizers
   verbs:
   - get
   - watch

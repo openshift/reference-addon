@@ -8,7 +8,7 @@ require (
 	github.com/mt-sre/go-ci v0.6.1
 	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.24.0
-	github.com/operator-framework/api v0.10.7
+	github.com/operator-framework/api v0.17.1
 	github.com/prometheus/client_golang v1.13.1
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/multierr v1.8.0

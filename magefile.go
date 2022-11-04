@@ -488,7 +488,7 @@ func (Check) Lint(ctx context.Context) error {
 
 	run := golangci(
 		command.WithContext{Context: ctx},
-		command.WithArgs{"run", "-v", "--fix"},
+		command.WithArgs{"run", "-v", "--fix", "--timeout", "5m"},
 		command.WithCurrentEnv(true),
 		command.WithEnv{
 			"GOLANGCI_LINT_CACHE": filepath.Join(_projectRoot, ".cache", "golangci-lint"),

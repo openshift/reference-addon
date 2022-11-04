@@ -514,7 +514,7 @@ var golangci = command.NewCommandAlias(filepath.Join(_depBin, "golangci-lint"))
 // in the 'go.mod/ and 'go.sum' files.
 func (Check) Tidy(ctx context.Context) error {
 	tidy := gocmd(
-		command.WithArgs{"mod", "tidy", "-compat=1.17"},
+		command.WithArgs{"mod", "tidy"},
 		command.WithConsoleOut(mg.Verbose()),
 		command.WithContext{Context: ctx},
 	)

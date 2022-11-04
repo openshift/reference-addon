@@ -488,7 +488,7 @@ func (Check) Lint(ctx context.Context) error {
 
 	run := golangci(
 		command.WithContext{Context: ctx},
-		command.WithArgs{"run", "-v", "--fix"},
+		command.WithArgs{"run", "-v", "--fix", "--timeout", "5m"},
 		command.WithCurrentEnv(true),
 		command.WithEnv{
 			"GOLANGCI_LINT_CACHE": filepath.Join(_projectRoot, ".cache", "golangci-lint"),
@@ -514,7 +514,7 @@ var golangci = command.NewCommandAlias(filepath.Join(_depBin, "golangci-lint"))
 // in the 'go.mod/ and 'go.sum' files.
 func (Check) Tidy(ctx context.Context) error {
 	tidy := gocmd(
-		command.WithArgs{"mod", "tidy", "-compat=1.17"},
+		command.WithArgs{"mod", "tidy"},
 		command.WithConsoleOut(mg.Verbose()),
 		command.WithContext{Context: ctx},
 	)

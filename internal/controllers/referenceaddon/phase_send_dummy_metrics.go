@@ -1,9 +1,7 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
-
-	"github.com/openshift/reference-addon/internal/controllers/phase"
 )
 
 func NewPhaseSendDummyMetrics(sampler ResponseSampler, opts ...PhaseSendDummyMetricsOption) *PhaseSendDummyMetrics {
@@ -24,10 +22,10 @@ type PhaseSendDummyMetrics struct {
 	sampler ResponseSampler
 }
 
-func (p *PhaseSendDummyMetrics) Execute(ctx context.Context, req phase.Request) phase.Result {
+func (p *PhaseSendDummyMetrics) Execute(ctx context.Context, req PhaseRequest) PhaseResult {
 	p.sampler.RequestSampleResponseData(p.cfg.SampleURLs...)
 
-	return phase.Success()
+	return PhaseResultSuccess()
 }
 
 type PhaseSendDummyMetricsConfig struct {

@@ -1,4 +1,4 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	refv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
-	"github.com/openshift/reference-addon/internal/controllers/phase"
+	"github.com/openshift/reference-addon/internal/controllers"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
@@ -37,20 +37,20 @@ type PhaseUninstall struct {
 	uninstaller Uninstaller
 }
 
-func (p *PhaseUninstall) Execute(ctx context.Context, req phase.Request) phase.Result {
+func (p *PhaseUninstall) Execute(ctx context.Context, req PhaseRequest) PhaseResult {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if !p.signaler.SignalUninstall(ctx) {
-		return phase.Success()
+		return PhaseResultSuccess()
 	}
 
 	if err := p.uninstaller.Uninstall(ctx, p.cfg.AddonNamespace, p.cfg.OperatorName); err != nil {
-		return phase.Error(fmt.Errorf("uninstalling addon: %w", err))
+		return PhaseResultError(fmt.Errorf("uninstalling addon: %w", err))
 	}
 
-	return phase.Blocking(
-		phase.WithConditions{
+	return PhaseResultBlocking(
+		WithConditions{
 			newAvailableCondition(
 				refv1alpha1.ReferenceAddonAvailableReasonUninstalling,
 				"uninstallation started",
@@ -306,15 +306,15 @@ func (c *ConfigMapUninstallSignalerConfig) Option(opts ...ConfigMapUninstallSign
 func (c *ConfigMapUninstallSignalerConfig) Validate() error {
 	var finalErr error
 
-	if err := validateOptionValue(c.AddonNamespace); err != nil {
+	if err := controllers.ValidateOptionValue(c.AddonNamespace); err != nil {
 		multierr.AppendInto(&finalErr, fmt.Errorf("validating AddonNamespace: %w", err))
 	}
 
-	if err := validateOptionValue(c.OperatorName); err != nil {
+	if err := controllers.ValidateOptionValue(c.OperatorName); err != nil {
 		multierr.AppendInto(&finalErr, fmt.Errorf("validating OperatorName: %w", err))
 	}
 
-	if err := validateOptionValue(c.DeleteLabel); err != nil {
+	if err := controllers.ValidateOptionValue(c.DeleteLabel); err != nil {
 		multierr.AppendInto(&finalErr, fmt.Errorf("validating DeleteLabel: %w", err))
 	}
 

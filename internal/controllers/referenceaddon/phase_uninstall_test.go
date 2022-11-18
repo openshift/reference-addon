@@ -1,10 +1,9 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
 	"testing"
 
-	"github.com/openshift/reference-addon/internal/controllers/phase"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,7 +18,7 @@ import (
 func TestPhaseUninstallInterfaces(t *testing.T) {
 	t.Parallel()
 
-	require.Implements(t, new(phase.Phase), new(PhaseUninstall))
+	require.Implements(t, new(Phase), new(PhaseUninstall))
 }
 
 func TestPhaseUninstall(t *testing.T) {
@@ -60,7 +59,7 @@ func TestPhaseUninstall(t *testing.T) {
 				WithOperatorName(tc.OperatorName),
 			)
 
-			res := p.Execute(context.Background(), phase.Request{})
+			res := p.Execute(context.Background(), PhaseRequest{})
 			require.NoError(t, res.Error())
 
 			signaler.AssertExpectations(t)

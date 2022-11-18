@@ -1,4 +1,4 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/reference-addon/internal/controllers/phase"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ParameterGetter interface {
-	GetParameters(ctx context.Context) (phase.RequestParameters, error)
+	GetParameters(ctx context.Context) (PhaseRequestParameters, error)
 }
 
 func NewSecretParameterGetter(client client.Client, opts ...SecretParameteterGetterOption) *SecretParameterGetter {
@@ -38,7 +37,7 @@ const (
 	sizeParameterID        = "size"
 )
 
-func (s *SecretParameterGetter) GetParameters(ctx context.Context) (phase.RequestParameters, error) {
+func (s *SecretParameterGetter) GetParameters(ctx context.Context) (PhaseRequestParameters, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -50,27 +49,27 @@ func (s *SecretParameterGetter) GetParameters(ctx context.Context) (phase.Reques
 	var secret corev1.Secret
 
 	if err := s.client.Get(ctx, key, &secret); err != nil {
-		return phase.NewRequestParameters(), fmt.Errorf("retrieving addon parameters secret: %w", err)
+		return NewPhaseRequestParameters(), fmt.Errorf("retrieving addon parameters secret: %w", err)
 	}
 
-	var opts []phase.RequestParametersOption
+	var opts []PhaseRequestParametersOption
 
 	if val, ok := secret.Data[applyNetworkPoliciesID]; ok {
 		b, err := parseBool(string(val))
 		if err != nil {
-			return phase.NewRequestParameters(), fmt.Errorf("parsing 'ApplyNetworkPolicies' value: %w", err)
+			return NewPhaseRequestParameters(), fmt.Errorf("parsing 'ApplyNetworkPolicies' value: %w", err)
 		}
 
-		opts = append(opts, phase.WithApplyNetworkPolicies{Value: &b})
+		opts = append(opts, WithApplyNetworkPolicies{Value: &b})
 	}
 
 	if val, ok := secret.Data[sizeParameterID]; ok {
 		s := string(val)
 
-		opts = append(opts, phase.WithSize{Value: &s})
+		opts = append(opts, WithSize{Value: &s})
 	}
 
-	return phase.NewRequestParameters(opts...), nil
+	return NewPhaseRequestParameters(opts...), nil
 }
 
 type SecretParameterGetterConfig struct {

@@ -1,11 +1,10 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/openshift/reference-addon/internal/controllers/phase"
 	"go.uber.org/multierr"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,13 +33,13 @@ type PhaseApplyNetworkPolicies struct {
 	client NetworkPolicyClient
 }
 
-func (p *PhaseApplyNetworkPolicies) Execute(ctx context.Context, req phase.Request) phase.Result {
+func (p *PhaseApplyNetworkPolicies) Execute(ctx context.Context, req PhaseRequest) PhaseResult {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	applyNetworkPolicies, ok := req.Params.GetApplyNetworkPolicies()
 	if !ok {
-		return phase.Success()
+		return PhaseResultSuccess()
 	}
 
 	if !applyNetworkPolicies {
@@ -50,28 +49,28 @@ func (p *PhaseApplyNetworkPolicies) Execute(ctx context.Context, req phase.Reque
 	return p.ensureNetworkPoliciesApplied(ctx, req)
 }
 
-func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesRemoved(ctx context.Context) phase.Result {
+func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesRemoved(ctx context.Context) PhaseResult {
 	p.cfg.Log.Info("removing NetworkPolicies", "count", len(p.cfg.Policies))
 
 	if err := p.client.RemoveNetworkPolicies(ctx, p.cfg.Policies...); err != nil {
-		return phase.Error(fmt.Errorf("deleting NetworkPolicies: %w", err))
+		return PhaseResultError(fmt.Errorf("deleting NetworkPolicies: %w", err))
 	}
 
 	p.cfg.Log.Info("successfully removed NetworkPolicies", "count", len(p.cfg.Policies))
 
-	return phase.Success()
+	return PhaseResultSuccess()
 }
 
-func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesApplied(ctx context.Context, req phase.Request) phase.Result {
+func (p *PhaseApplyNetworkPolicies) ensureNetworkPoliciesApplied(ctx context.Context, req PhaseRequest) PhaseResult {
 	p.cfg.Log.Info("applying NetworkPolicies", "count", len(p.cfg.Policies))
 
 	if err := p.client.ApplyNetworkPolicies(ctx, WithOwner{Owner: &req.Addon}, WithPolicies(p.cfg.Policies)); err != nil {
-		return phase.Error(fmt.Errorf("applying NetworkPolicies: %w", err))
+		return PhaseResultError(fmt.Errorf("applying NetworkPolicies: %w", err))
 	}
 
 	p.cfg.Log.Info("successfully applied NetworkPolicies", "count", len(p.cfg.Policies))
 
-	return phase.Success()
+	return PhaseResultSuccess()
 }
 
 type PhaseApplyNetworkPoliciesConfig struct {

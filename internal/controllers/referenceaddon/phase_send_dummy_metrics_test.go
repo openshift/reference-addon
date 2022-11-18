@@ -1,10 +1,9 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
 	"testing"
 
-	"github.com/openshift/reference-addon/internal/controllers/phase"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -13,7 +12,7 @@ import (
 func TestPhaseSendDummyMetricsInterface(t *testing.T) {
 	t.Parallel()
 
-	require.Implements(t, new(phase.Phase), new(PhaseSendDummyMetrics))
+	require.Implements(t, new(Phase), new(PhaseSendDummyMetrics))
 }
 
 func TestPhaseSendDummyMetrics(t *testing.T) {
@@ -44,10 +43,10 @@ func TestPhaseSendDummyMetrics(t *testing.T) {
 
 			p := NewPhaseSendDummyMetrics(&sampler, WithSampleURLs(tc.SampleURLs))
 
-			res := p.Execute(context.Background(), phase.Request{})
+			res := p.Execute(context.Background(), PhaseRequest{})
 			require.NoError(t, res.Error())
 
-			assert.Equal(t, phase.StatusSuccess, res.Status())
+			assert.Equal(t, PhaseStatusSuccess, res.Status())
 		})
 	}
 }

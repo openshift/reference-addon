@@ -1,10 +1,10 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
 	"testing"
 
-	"github.com/openshift/reference-addon/internal/controllers/phase"
+	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,7 +17,7 @@ import (
 func TestPhaseApplyNetworkPoliciesInterfaces(t *testing.T) {
 	t.Parallel()
 
-	require.Implements(t, new(phase.Phase), new(PhaseApplyNetworkPolicies))
+	require.Implements(t, new(Phase), new(PhaseApplyNetworkPolicies))
 }
 
 func TestPhaseApplyNetworkPolicies(t *testing.T) {
@@ -31,10 +31,10 @@ func TestPhaseApplyNetworkPolicies(t *testing.T) {
 			ApplyNetworkPolicy: nil,
 		},
 		"applyNetworkPolicies false/no NetworkPolicies": {
-			ApplyNetworkPolicy: boolPtr(false),
+			ApplyNetworkPolicy: controllers.BoolPtr(false),
 		},
 		"applyNetworkPolicies false/with NetworkPolicies": {
-			ApplyNetworkPolicy: boolPtr(false),
+			ApplyNetworkPolicy: controllers.BoolPtr(false),
 			Policies: []netv1.NetworkPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -45,10 +45,10 @@ func TestPhaseApplyNetworkPolicies(t *testing.T) {
 			},
 		},
 		"applyNetworkPolicies true/no NetworkPolicies": {
-			ApplyNetworkPolicy: boolPtr(false),
+			ApplyNetworkPolicy: controllers.BoolPtr(false),
 		},
 		"applyNetworkPolicies true/with NetworkPolicies": {
-			ApplyNetworkPolicy: boolPtr(true),
+			ApplyNetworkPolicy: controllers.BoolPtr(true),
 			Policies: []netv1.NetworkPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -93,14 +93,14 @@ func TestPhaseApplyNetworkPolicies(t *testing.T) {
 				WithPolicies(tc.Policies),
 			)
 
-			res := p.Execute(context.Background(), phase.Request{
-				Params: phase.NewRequestParameters(
-					phase.WithApplyNetworkPolicies{Value: tc.ApplyNetworkPolicy},
+			res := p.Execute(context.Background(), PhaseRequest{
+				Params: NewPhaseRequestParameters(
+					WithApplyNetworkPolicies{Value: tc.ApplyNetworkPolicy},
 				),
 			})
 			require.NoError(t, res.Error())
 
-			assert.Equal(t, phase.StatusSuccess, res.Status())
+			assert.Equal(t, PhaseStatusSuccess, res.Status())
 
 			m.AssertExpectations(t)
 		})

@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-logr/logr"
 	refapis "github.com/openshift/reference-addon/apis"
-	"github.com/openshift/reference-addon/internal/controllers"
+	ractrl "github.com/openshift/reference-addon/internal/controllers/referenceaddon"
 	"github.com/openshift/reference-addon/internal/metrics"
 	"github.com/openshift/reference-addon/internal/pprof"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -109,18 +109,18 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 
 	client := mgr.GetClient()
 
-	r, err := controllers.NewReferenceAddonReconciler(
+	r, err := ractrl.NewReferenceAddonReconciler(
 		client,
-		controllers.NewSecretParameterGetter(
+		ractrl.NewSecretParameterGetter(
 			client,
-			controllers.WithNamespace(opts.Namespace),
-			controllers.WithName(opts.ParameterSecretname),
+			ractrl.WithNamespace(opts.Namespace),
+			ractrl.WithName(opts.ParameterSecretname),
 		),
-		controllers.WithLog{Log: ctrl.Log.WithName("controller").WithName("referenceaddon")},
-		controllers.WithAddonNamespace(opts.Namespace),
-		controllers.WithAddonParameterSecretName(opts.ParameterSecretname),
-		controllers.WithOperatorName(opts.OperatorName),
-		controllers.WithDeleteLabel(opts.DeleteLabel),
+		ractrl.WithLog{Log: ctrl.Log.WithName("controller").WithName("referenceaddon")},
+		ractrl.WithAddonNamespace(opts.Namespace),
+		ractrl.WithAddonParameterSecretName(opts.ParameterSecretname),
+		ractrl.WithOperatorName(opts.OperatorName),
+		ractrl.WithDeleteLabel(opts.DeleteLabel),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing reference addon controller: %w", err)

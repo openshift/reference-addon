@@ -1,10 +1,10 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
 	"testing"
 
-	"github.com/openshift/reference-addon/internal/controllers/phase"
+	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -25,7 +25,7 @@ func TestSecretParameterGetter(t *testing.T) {
 		ActualSecret   *corev1.Secret
 		Namespace      string
 		Name           string
-		ExpectedParams phase.RequestParameters
+		ExpectedParams PhaseRequestParameters
 	}{
 		"happy path": {
 			ActualSecret: &corev1.Secret{
@@ -40,9 +40,9 @@ func TestSecretParameterGetter(t *testing.T) {
 			},
 			Namespace: "test-namespace",
 			Name:      "test",
-			ExpectedParams: phase.NewRequestParameters(
-				phase.WithApplyNetworkPolicies{Value: boolPtr(true)},
-				phase.WithSize{Value: stringPtr("1")},
+			ExpectedParams: NewPhaseRequestParameters(
+				WithApplyNetworkPolicies{Value: controllers.BoolPtr(true)},
+				WithSize{Value: controllers.StringPtr("1")},
 			),
 		},
 	} {

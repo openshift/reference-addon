@@ -1,4 +1,4 @@
-package controllers
+package referenceaddon
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	refv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
-	"github.com/openshift/reference-addon/internal/controllers/phase"
+	"github.com/openshift/reference-addon/internal/controllers"
 	"github.com/openshift/reference-addon/internal/metrics"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,7 +51,7 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 		cfg:         cfg,
 		client:      NewReferenceAddonClient(client),
 		paramGetter: getter,
-		orderedPhases: []phase.Phase{
+		orderedPhases: []Phase{
 			NewPhaseUninstall(
 				signaler,
 				NewUninstallerImpl(
@@ -97,7 +97,7 @@ type ReferenceAddonReconciler struct {
 	client      ReferenceAddonClient
 	paramGetter ParameterGetter
 
-	orderedPhases []phase.Phase
+	orderedPhases []Phase
 }
 
 func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -129,7 +129,7 @@ func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		)
 	}
 
-	phaseReq := phase.Request{
+	phaseReq := PhaseRequest{
 		Addon:  *addon,
 		Params: params,
 	}
@@ -144,11 +144,11 @@ func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 
 		switch res.Status() {
-		case phase.StatusError:
+		case PhaseStatusError:
 			return ctrl.Result{}, res.Error()
-		case phase.StatusFailure:
+		case PhaseStatusFailure:
 			return ctrl.Result{Requeue: true}, nil
-		case phase.StatusBlocking:
+		case PhaseStatusBlocking:
 			return ctrl.Result{}, nil
 		}
 	}
@@ -190,27 +190,27 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&refv1alpha1.ReferenceAddon{}).
 		Watches(
-			enqueueObject(requestObject),
+			controllers.EnqueueObject(requestObject),
 			refAddonHandler,
 		).
 		Owns(
 			&netv1.NetworkPolicy{},
-			builder.WithPredicates(hasName(generateIngressPolicyName(r.cfg.OperatorName))),
+			builder.WithPredicates(controllers.HasName(generateIngressPolicyName(r.cfg.OperatorName))),
 		).
 		Watches(
 			&source.Kind{Type: &opsv1alpha1.ClusterServiceVersion{}},
 			refAddonHandler,
-			builder.WithPredicates(hasNamePrefix(r.cfg.OperatorName)),
+			builder.WithPredicates(controllers.HasNamePrefix(r.cfg.OperatorName)),
 		).
 		Watches(
 			&source.Kind{Type: &corev1.ConfigMap{}},
 			refAddonHandler,
-			builder.WithPredicates(hasName(r.cfg.OperatorName)),
+			builder.WithPredicates(controllers.HasName(r.cfg.OperatorName)),
 		).
 		Watches(
 			&source.Kind{Type: &corev1.Secret{}},
 			refAddonHandler,
-			builder.WithPredicates(hasName(r.cfg.AddonParameterSecretname)),
+			builder.WithPredicates(controllers.HasName(r.cfg.AddonParameterSecretname)),
 		).
 		Complete(r)
 }

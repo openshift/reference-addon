@@ -1,4 +1,4 @@
-package controllers
+package referenceaddon
 
 import (
 	"github.com/go-logr/logr"

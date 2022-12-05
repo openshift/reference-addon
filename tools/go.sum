@@ -406,8 +406,8 @@ github.com/mbilski/exhaustivestruct v1.2.0 h1:wCBmUnSYufAHO6J4AVWY6ff+oxWxsVFrwg
 github.com/mbilski/exhaustivestruct v1.2.0/go.mod h1:OeTBVxQWoEmB2J2JCHmXWPJ0aksxSUOUy+nvtVEfzXc=
 github.com/mgechev/revive v1.2.4 h1:+2Hd/S8oO2H0Ikq2+egtNwQsVhAeELHjxjIUFX5ajLI=
 github.com/mgechev/revive v1.2.4/go.mod h1:iAWlQishqCuj4yhV24FTnKSXGpbAA+0SckXB8GQMX/Q=
-github.com/mikefarah/yq/v4 v4.30.4 h1:SAfOVRi36BjpN5/SI6dZJ80Gpwj4eIGsXY2zQSe+LXM=
-github.com/mikefarah/yq/v4 v4.30.4/go.mod h1:KBm6Ec5wLC5kiKJaDZfN4a7KWrJrf4rFPUZAmgleIAg=
+github.com/mikefarah/yq/v4 v4.30.5 h1:zUJgtVH1f9GFdl+FJ/WGOFA2bLjXrnJ/GsKxjGa68jQ=
+github.com/mikefarah/yq/v4 v4.30.5/go.mod h1:KBm6Ec5wLC5kiKJaDZfN4a7KWrJrf4rFPUZAmgleIAg=
 github.com/mitchellh/go-homedir v1.1.0 h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=

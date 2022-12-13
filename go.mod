@@ -11,7 +11,7 @@ require (
 	github.com/operator-framework/api v0.17.2
 	github.com/prometheus/client_golang v1.14.0
 	github.com/stretchr/testify v1.8.1
-	go.uber.org/multierr v1.8.0
+	go.uber.org/multierr v1.9.0
 	k8s.io/api v0.26.0
 	k8s.io/apiextensions-apiserver v0.25.4
 	k8s.io/apimachinery v0.26.0

@@ -6,8 +6,8 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/magefile/mage v1.14.0
 	github.com/mt-sre/go-ci v0.6.1
-	github.com/onsi/ginkgo/v2 v2.6.0
-	github.com/onsi/gomega v1.24.1
+	github.com/onsi/ginkgo/v2 v2.6.1
+	github.com/onsi/gomega v1.24.2
 	github.com/operator-framework/api v0.17.3
 	github.com/prometheus/client_golang v1.14.0
 	github.com/stretchr/testify v1.8.1
@@ -59,7 +59,7 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10 // indirect
+	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/term v0.3.0 // indirect

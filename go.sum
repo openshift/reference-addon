@@ -210,8 +210,8 @@ github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742/go.mod h1:bx2lN
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/modern-go/reflect2 v1.0.2 h1:xBagoLtFs94CBntxluKeaWgTMpvLxC4ur3nMaC9Gz0M=
 github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
-github.com/mt-sre/go-ci v0.6.2 h1:lrXnqt2AkUCyYt4hkLtPiUCSLJqKVeW08L1P1lP51PE=
-github.com/mt-sre/go-ci v0.6.2/go.mod h1:9hdq2Gbj2s1hknF1V6hiWsqZWzpgm9t7UaiIKGlHofI=
+github.com/mt-sre/go-ci v0.6.3 h1:4RyF2eJ5LpTclN+GBHfWTTr0CBdmqXkQKq0wx3rXteQ=
+github.com/mt-sre/go-ci v0.6.3/go.mod h1:MwfLOtA1nHJdJCtyTLIlt+Pm4c1eLpzkjHPPnQlLpbU=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=

@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reference-addon
+  labels:
+    app.kubernetes.io/name: reference-addon

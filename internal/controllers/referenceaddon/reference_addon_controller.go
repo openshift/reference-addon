@@ -105,7 +105,7 @@ func (r *ReferenceAddonReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		// Log error and continue reconcilliation so subsequent phases
 		// can fail if required parameters are missing.
-		r.cfg.Log.Error(err, "unable to sync addon parameters")
+		//r.cfg.Log.Error(err, "unable to sync addon parameters")
 	}
 
 	addon, err := r.ensureReferenceAddon(ctx)

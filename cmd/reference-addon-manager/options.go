@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"os"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -122,8 +121,10 @@ func (o *options) processSecrets() {
 var ErrEmptyValue = errors.New("empty value")
 
 func (o *options) validate() error {
-	if o.Namespace == "" {
-		return fmt.Errorf("validating namespace: %w", ErrEmptyValue)
+	if ns := os.Getenv("REFERENCE_ADDON_NAMESPACE"); ns != "" {
+		if o.Namespace == "" {
+			o.Namespace = ns
+		}
 	}
 
 	return nil

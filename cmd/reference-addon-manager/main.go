@@ -12,7 +12,9 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/go-logr/logr"
+	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	refapis "github.com/openshift/reference-addon/apis"
+	"github.com/openshift/reference-addon/internal/controllers"
 	ractrl "github.com/openshift/reference-addon/internal/controllers/referenceaddon"
 	"github.com/openshift/reference-addon/internal/metrics"
 	"github.com/openshift/reference-addon/internal/pprof"
@@ -23,10 +25,10 @@ func main() {
 	opts := options{
 		DeleteLabel:           "api.openshift.com/addon-reference-addon-delete",
 		EnableMetricsRecorder: true,
-		MetricsAddr:           ":8080",
+		MetricsAddr:           ":9080",
 		OperatorName:          "reference-addon",
 		ParameterSecretname:   "addon-reference-addon-parameters",
-		ProbeAddr:             ":8081",
+		ProbeAddr:             ":9081",
 		Zap: zap.Options{
 			Development: true,
 		},
@@ -93,6 +95,7 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	if err := mgr.AddHealthzCheck("health", healthz.Ping); err != nil {
 		return nil, fmt.Errorf("adding healthz check to manager: %w", err)
 	}
+
 	if err := mgr.AddReadyzCheck("check", healthz.Ping); err != nil {
 		return nil, fmt.Errorf("adding readyz check to manager: %w", err)
 	}
@@ -130,6 +133,18 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
 	}
 
+	// status controller
+	statusctlr := controllers.NewStatusControllerReconciler(
+		client,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initializing status controller: %w", err)
+	}
+
+	if err := statusctlr.SetupWithManager(mgr); err != nil {
+		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
+	}
+
 	return mgr, nil
 }
 
@@ -148,6 +163,11 @@ func initializeScheme() (*runtime.Scheme, error) {
 		return nil, fmt.Errorf("adding Operators v1alpha1 APIs to scheme :%w", err)
 	}
 
+	if err := av1alpha1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("adding addon-operator v1alpha1 APIs to scheme :%w", err)
+	}
+
+	clientgoscheme.AddToScheme(scheme)
 	return scheme, nil
 }
 

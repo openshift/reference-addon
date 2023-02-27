@@ -12,7 +12,7 @@ require (
 	github.com/openshift/addon-operator/apis v0.0.0-20221221142505-ff0461059e46
 	github.com/operator-framework/api v0.17.3
 	github.com/prometheus/client_golang v1.14.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.9.0
 	k8s.io/api v0.26.1
 	k8s.io/apiextensions-apiserver v0.26.1

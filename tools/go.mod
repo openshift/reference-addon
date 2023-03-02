@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/golangci/golangci-lint v1.51.0
-	github.com/mikefarah/yq/v4 v4.31.1
+	github.com/mikefarah/yq/v4 v4.31.2
 	github.com/onsi/ginkgo/v2 v2.8.4
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf
 	sigs.k8s.io/controller-tools v0.11.3
@@ -21,7 +21,7 @@ require (
 	github.com/GaijinEntertainment/go-exhaustruct/v2 v2.3.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/OpenPeeDeeP/depguard v1.1.1 // indirect
-	github.com/a8m/envsubst v1.4.1 // indirect
+	github.com/a8m/envsubst v1.4.2 // indirect
 	github.com/alecthomas/participle/v2 v2.0.0-beta.5 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
 	github.com/alingse/asasalint v0.0.11 // indirect

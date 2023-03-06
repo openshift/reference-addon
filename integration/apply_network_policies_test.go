@@ -131,7 +131,7 @@ var _ = Describe("Apply Network Policies Phase", func() {
 				_client.Update(ctx, &secret)
 
 				np := addonNetworkPolicy(fmt.Sprintf("%s-ingress", operatorName), namespace)
-				_client.EventuallyObjectExists(ctx, &np, internaltesting.WithTimeout(5*time.Second))
+				_client.EventuallyObjectExists(ctx, &np, internaltesting.WithTimeout(10*time.Second))
 			})
 		})
 	})

@@ -612,7 +612,7 @@ func (Test) Integration(ctx context.Context) error {
 	if !usingExistingCluster() {
 		var err error
 
-		assetsDir, err = setupEnvTest(ctx, _depBin, "1.22.x!")
+		assetsDir, err = setupEnvTest(ctx, _depBin, "1.26.x!")
 		if err != nil {
 			return fmt.Errorf("setting up env-test: %w", err)
 		}

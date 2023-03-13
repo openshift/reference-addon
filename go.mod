@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/go-logr/logr v1.2.3
 	github.com/magefile/mage v1.14.0
-	github.com/mt-sre/go-ci v0.6.4
+	github.com/mt-sre/go-ci v0.6.5
 	github.com/onsi/ginkgo/v2 v2.9.1
 	github.com/onsi/gomega v1.27.3
 	github.com/operator-framework/api v0.17.3

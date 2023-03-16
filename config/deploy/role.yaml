@@ -1,8 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: reference-addon
-  namespace: redhat-reference-addon
+  name: operator
 rules:
 - apiGroups:
   - ""

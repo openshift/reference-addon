@@ -1,4 +1,4 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: redhat-reference-addon
+  name: reference-addon-operator

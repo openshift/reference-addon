@@ -3,7 +3,7 @@ module tools
 go 1.19
 
 require (
-	github.com/golangci/golangci-lint v1.52.0
+	github.com/golangci/golangci-lint v1.52.1
 	github.com/mikefarah/yq/v4 v4.32.2
 	github.com/onsi/ginkgo/v2 v2.9.1
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf

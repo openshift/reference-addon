@@ -7,7 +7,7 @@ require (
 	github.com/magefile/mage v1.14.0
 	github.com/mt-sre/go-ci v0.6.5
 	github.com/onsi/ginkgo/v2 v2.9.2
-	github.com/onsi/gomega v1.27.4
+	github.com/onsi/gomega v1.27.5
 	github.com/operator-framework/api v0.17.3
 	github.com/otiai10/copy v1.9.0
 	github.com/prometheus/client_golang v1.14.0

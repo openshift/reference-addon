@@ -143,6 +143,7 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	if err := statusctlr.SetupWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
 	}
+	//TODO add the actual logic
 
 	return mgr, nil
 }

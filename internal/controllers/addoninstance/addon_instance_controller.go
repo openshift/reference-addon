@@ -6,36 +6,66 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+
 	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	addoninstance "github.com/openshift/addon-operator/pkg/client"
 	rv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-const (
-	// Default timeout when we do a manual RequeueAfter
-	defaultRetryAfterTime = 10 * time.Second
-)
-
-// Global Flag for Install State
-var installState int
 
 type StatusControllerReconciler struct {
+	cfg                 StatusControllerReconcilerConfig
 	client              client.Client
 	addonInstanceClient *addoninstance.AddonInstanceClientImpl
+	installed           bool
 }
 
-// Review Grab Namespace at this stage (TO BE FIXED)
-func NewStatusControllerReconciler(client client.Client) *StatusControllerReconciler {
-	ctx, desiredAddonInstance := addoninstancereconcile.ensureReferenceAddon(&StatusControllerReconciler)
+// Grabbing namespace/name needs to be an option
+func NewStatusControllerReconciler(client client.Client, opts ...StatusControllerReconcilerOption) *StatusControllerReconciler {
+	var cfg StatusControllerReconcilerConfig
+
+	cfg.Option(opts...)
+	cfg.Default()
+
 	return &StatusControllerReconciler{
+		cfg:                 cfg,
 		client:              client,
 		addonInstanceClient: addoninstance.NewAddonInstanceClient(client),
-		name:                desiredAddonInstance.Name,
-		namespace:           desiredAddonInstance.Namespace,
+	}
+}
+
+type StatusControllerReconcilerConfig struct {
+	Log                       logr.Logger
+	statusControllerNamespace string
+	statusControllerName      string
+	referenceAddonNamespace   string
+	referenceAddonName        string
+	retryAfterTime            time.Duration
+}
+
+type StatusControllerReconcilerOption interface {
+	ConfigureStatusControllerReconciler(*StatusControllerReconcilerConfig)
+}
+
+// Status controller option
+func (c *StatusControllerReconcilerConfig) Option(opts ...StatusControllerReconcilerOption) {
+	for _, opt := range opts {
+		opt.ConfigureStatusControllerReconciler(c)
+	}
+}
+
+func (c *StatusControllerReconcilerConfig) Default() {
+	if c.Log.GetSink() == nil {
+		c.Log = logr.Discard()
+	}
+	if c.retryAfterTime == 0 {
+		c.retryAfterTime = 10 * time.Second
 	}
 }
 
@@ -47,81 +77,54 @@ func (r *StatusControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // Utilize info gathered from SetupWithManager to perform logic against
-func (s *StatusControllerReconciler) Reconcile(ctx context.Context) (ctrl.Result, error) {
+func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcile.Request) (ctrl.Result, error) {
 	log := log.Log.WithName("reference addon - addon instance")
-	addonClient := NewStatusControllerReconciler(s.client)
-	key := client.ObjectKey{
-		//Review Put values obtained from constructor here instead
-		Namespace: addonClient.namespace,
-		Name:      addonClient.name,
+
+	// Create reference addon key
+	referenceAddonKey := client.ObjectKey{
+		Namespace: s.cfg.referenceAddonNamespace,
+		Name:      s.cfg.referenceAddonName,
 	}
 
-	log.Info("find reference addon: ", key.Namespace, key.Name)
-	referenceaddon := &rv1alpha1.ReferenceAddon{}
-	if err := s.client.Get(ctx, key, referenceaddon); err != nil {
-		return ctrl.Result{}, fmt.Errorf("getting Reference-Addon Object'%s/%s': %w", key.Namespace, key.Name, err)
+	//Build reference-addon constructor with options to grab namespace/name (do it for Addon-instance as well)
+	// Obtain current reference addon state
+	log.Info("find reference addon: ", referenceAddonKey.Namespace, referenceAddonKey.Name)
+	referenceAddon := &rv1alpha1.ReferenceAddon{}
+	if err := s.client.Get(ctx, referenceAddonKey, referenceAddon); err != nil {
+		return ctrl.Result{}, fmt.Errorf("getting Reference-Addon Object'%s/%s': %w", referenceAddonKey.Namespace, referenceAddonKey.Name, err)
+	}
+	log.Info("found reference addon: ", referenceAddon)
+
+	// Reference addon is available
+	if !s.installed && meta.IsStatusConditionTrue(referenceAddon.Status.Conditions, "Ready") {
+		s.installed = true
+		log.Info("Reference Addon Successfully Installed")
 	}
 
-	log.Info("find addon instance: ", key.Namespace, key.Name)
+	// Create addon instance key
+	statusControllerKey := client.ObjectKey{
+		Namespace: s.cfg.statusControllerNamespace,
+		Name:      s.cfg.statusControllerName,
+	}
+
+	// Obtain current addon instance
+	log.Info("find addon instance: ", statusControllerKey.Namespace, statusControllerKey.Name)
 	addonInstance := &av1alpha1.AddonInstance{}
-	if err := s.client.Get(ctx, key, addonInstance); err != nil {
-		return ctrl.Result{}, fmt.Errorf("getting AddonInstance Object'%s/%s': %w", key.Namespace, key.Name, err)
+	if err := s.client.Get(ctx, statusControllerKey, addonInstance); err != nil {
+		return ctrl.Result{}, fmt.Errorf("getting AddonInstance Object'%s/%s': %w", statusControllerKey.Namespace, statusControllerKey.Name, err)
 	}
 	log.Info("found addon instance: ", addonInstance)
 
-	getAddonInstanceUpdateCondition(referenceaddon, addonInstance, log)
+	// update the status before sending pulse
+	addonInstance.Status.Conditions = referenceAddon.Status.Conditions
 
-	var updatedInstance av1alpha1.AddonInstance
-
-	//Condition for install state successful
-	installSuccess := []metav1.Condition{
-		addoninstance.NewAddonInstanceConditionInstalled(
-			"True",
-			av1alpha1.AddonInstanceInstalledReasonSetupComplete,
-			"All components up",
-		),
-	}
-
-	degradedState := []metav1.Condition{
-		addoninstance.NewAddonInstanceConditionDegraded(
-			"True",
-			string(av1alpha1.AddonInstanceConditionDegraded),
-			"Service Degraded",
-		),
-	}
-	// Send Pulse to gather info from installation of addon instance
+	// Send Pulse to addon operator to report health of reference addon
 	err := s.addonInstanceClient.SendPulse(ctx, *addonInstance, nil)
 	if err != nil {
-		err := s.client.Get(ctx, client.ObjectKeyFromObject(addonInstance), &updatedInstance)
-		if err != nil {
-			// Check install state 0 = not installed, 1 = installed
-			for i := 0; i < len(updatedInstance.Status.Conditions); i++ {
-				if installState == 0 {
-					log.Info("Checking for Installed State: ", key.Namespace, key.Name)
-					if updatedInstance.Status.Conditions[i] == installSuccess[0] {
-						installState = 1
-						// Write that it was installed for first time as this will be skipped after each time
-						return ctrl.Result{}, nil
-						// Not installed throw error
-					} else {
-						return ctrl.Result{}, fmt.Errorf("AddonInstance not Installed '%s/%s': %w", key.Namespace, key.Name, err)
-					}
-				}
-				// Check Degraded State
-				log.Info("Checking for Degraded State: ", key.Namespace, key.Name)
-				if updatedInstance.Status.Conditions[i] == degradedState[0] {
-					return ctrl.Result{}, fmt.Errorf("AddonInstance service is Degraded '%s/%s': %w", key.Namespace, key.Name, err)
-				}
-			}
-			log.Info("successfully reconciled AddonInstance")
-			return ctrl.Result{}, nil
-		}
+		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, fmt.Errorf("Failed getting AddonInstance State '%s/%s': %w", key.Namespace, key.Name, err)
-}
 
-func getAddonInstanceUpdateCondition(referenceaddon *rv1alpha1.ReferenceAddon, addonInstance *av1alpha1.AddonInstance, log logr.Logger) {
-	if referenceaddon.HasConditionAvailable() {
-		log.Info("condition available")
-	}
+	log.Info("successfully reconciled AddonInstance")
+
+	return ctrl.Result{RequeueAfter: s.cfg.retryAfterTime}, nil
 }

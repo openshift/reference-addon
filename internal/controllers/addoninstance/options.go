@@ -15,29 +15,29 @@ func (w WithLog) ConfigureStatusControllerReconciler(c *StatusControllerReconcil
 type WithStatusControllerNamespace string
 
 func (w WithStatusControllerNamespace) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.statusControllerNamespace = string(w)
+	c.StatusControllerNamespace = string(w)
 }
 
 type WithStatusControllerName string
 
 func (w WithStatusControllerName) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.statusControllerName = string(w)
+	c.StatusControllerName = string(w)
 }
 
 type WithReferenceAddonNamespace string
 
 func (w WithReferenceAddonNamespace) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.referenceAddonNamespace = string(w)
+	c.ReferenceAddonNamespace = string(w)
 }
 
 type WithReferenceAddonName string
 
 func (w WithReferenceAddonName) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.referenceAddonName = string(w)
+	c.ReferenceAddonName = string(w)
 }
 
 type WithRetryAfterTime int
 
 func (w WithRetryAfterTime) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.retryAfterTime = time.Duration(w)
+	c.RetryAfterTime = time.Duration(w)
 }

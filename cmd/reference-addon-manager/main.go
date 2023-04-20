@@ -137,7 +137,7 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	}
 
 	// status controller
-	statusctlr, err := addoninstance.NewStatusControllerReconciler(
+	statusctlr, statuserr := addoninstance.NewStatusControllerReconciler(
 		client,
 		addoninstance.WithLog{Log: ctrl.Log.WithName("controller").WithName("addoninstance")},
 		addoninstance.WithStatusControllerNamespace(opts.StatusControllerNamespace),
@@ -146,12 +146,12 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 		addoninstance.WithReferenceAddonName(opts.OperatorName),
 		addoninstance.WithRetryAfterTime(opts.RetryAfterTime),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing status controller: %w", err)
+	if statuserr != nil {
+		return nil, fmt.Errorf("initializing status controller: %w", statuserr)
 	}
 
-	if err := statusctlr.SetupWithManager(mgr); err != nil {
-		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
+	if statuserr := statusctlr.SetupWithManager(mgr); statuserr != nil {
+		return nil, fmt.Errorf("setting up reference addon controller: %w", statuserr)
 	}
 
 	return mgr, nil

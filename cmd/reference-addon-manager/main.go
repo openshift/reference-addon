@@ -144,7 +144,7 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 		addoninstance.WithStatusControllerName(opts.StatusControllerName),
 		addoninstance.WithReferenceAddonNamespace(opts.Namespace),
 		addoninstance.WithReferenceAddonName(opts.OperatorName),
-		addoninstance.WithRetryAfterTime(10),
+		addoninstance.WithRetryAfterTime(opts.RetryAfterTime),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing status controller: %w", err)

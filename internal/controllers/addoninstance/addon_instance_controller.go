@@ -10,13 +10,18 @@ import (
 	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	addoninstance "github.com/openshift/addon-operator/pkg/client"
 	rv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
+	"github.com/openshift/reference-addon/internal/controllers"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 type StatusControllerReconciler struct {
@@ -71,8 +76,26 @@ func (c *StatusControllerReconcilerConfig) Default() {
 
 // Watch reference addon actions to trigger addon instance
 func (r *StatusControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	//desired := r.desiredReferenceAddon()
+	requestObject := types.NamespacedName{
+		Name:      r.cfg.StatusControllerName,
+		Namespace: r.cfg.StatusControllerNamespace,
+	}
+
+	statusControllerHandler := handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
+		return []reconcile.Request{
+			{
+				NamespacedName: requestObject,
+			},
+		}
+	})
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&rv1alpha1.ReferenceAddon{}).
+		For(&av1alpha1.AddonInstance{}).
+		Watches(
+			&source.Kind{Type: &rv1alpha1.ReferenceAddon{}},
+			statusControllerHandler,
+			builder.WithPredicates(controllers.HasNamePrefix(r.cfg.ReferenceAddonName)),
+		).
 		Complete(r)
 }
 

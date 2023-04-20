@@ -10,8 +10,8 @@ import (
 	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	addoninstance "github.com/openshift/addon-operator/pkg/client"
 	rv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
-
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,11 +42,11 @@ func NewStatusControllerReconciler(client client.Client, opts ...StatusControlle
 
 type StatusControllerReconcilerConfig struct {
 	Log                       logr.Logger
-	statusControllerNamespace string
-	statusControllerName      string
-	referenceAddonNamespace   string
-	referenceAddonName        string
-	retryAfterTime            time.Duration
+	StatusControllerNamespace string
+	StatusControllerName      string
+	ReferenceAddonNamespace   string
+	ReferenceAddonName        string
+	RetryAfterTime            time.Duration
 }
 
 type StatusControllerReconcilerOption interface {
@@ -64,8 +64,8 @@ func (c *StatusControllerReconcilerConfig) Default() {
 	if c.Log.GetSink() == nil {
 		c.Log = logr.Discard()
 	}
-	if c.retryAfterTime == 0 {
-		c.retryAfterTime = 10 * time.Second
+	if c.RetryAfterTime == 0 {
+		c.RetryAfterTime = 10 * time.Second
 	}
 }
 
@@ -82,8 +82,8 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 
 	// Create reference addon key
 	referenceAddonKey := client.ObjectKey{
-		Namespace: s.cfg.referenceAddonNamespace,
-		Name:      s.cfg.referenceAddonName,
+		Namespace: s.cfg.ReferenceAddonNamespace,
+		Name:      s.cfg.ReferenceAddonName,
 	}
 
 	//Build reference-addon constructor with options to grab namespace/name (do it for Addon-instance as well)
@@ -95,16 +95,24 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 	}
 	log.Info("found reference addon: ", referenceAddon)
 
-	// Reference addon is available
-	if !s.installed && meta.IsStatusConditionTrue(referenceAddon.Status.Conditions, "Ready") {
+	// Intialize conditions slice
+	var conditions []metav1.Condition
+
+	// Check if Reference addon is available for the first time
+	if !s.installed && meta.IsStatusConditionTrue(referenceAddon.Status.Conditions, string(rv1alpha1.ReferenceAddonConditionAvailable)) {
 		s.installed = true
+		conditions = append(conditions, addoninstance.NewAddonInstanceConditionInstalled(
+			"True",
+			av1alpha1.AddonInstanceInstalledReasonSetupComplete,
+			"All Components Available",
+		))
 		log.Info("Reference Addon Successfully Installed")
 	}
 
 	// Create addon instance key
 	statusControllerKey := client.ObjectKey{
-		Namespace: s.cfg.statusControllerNamespace,
-		Name:      s.cfg.statusControllerName,
+		Namespace: s.cfg.StatusControllerNamespace,
+		Name:      s.cfg.StatusControllerName,
 	}
 
 	// Obtain current addon instance
@@ -115,16 +123,13 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 	}
 	log.Info("found addon instance: ", addonInstance)
 
-	// update the status before sending pulse
-	addonInstance.Status.Conditions = referenceAddon.Status.Conditions
-
 	// Send Pulse to addon operator to report health of reference addon
-	err := s.addonInstanceClient.SendPulse(ctx, *addonInstance, nil)
+	err := s.addonInstanceClient.SendPulse(ctx, *addonInstance, addoninstance.WithConditions(conditions))
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	log.Info("successfully reconciled AddonInstance")
 
-	return ctrl.Result{RequeueAfter: s.cfg.retryAfterTime}, nil
+	return ctrl.Result{RequeueAfter: s.cfg.RetryAfterTime}, nil
 }

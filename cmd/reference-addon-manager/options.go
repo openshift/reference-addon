@@ -5,21 +5,25 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 type options struct {
-	DeleteLabel           string
-	EnableLeaderElection  bool
-	EnableMetricsRecorder bool
-	MetricsAddr           string
-	Namespace             string
-	OperatorName          string
-	ParameterSecretname   string
-	PprofAddr             string
-	ProbeAddr             string
-	Zap                   zap.Options
+	DeleteLabel               string
+	EnableLeaderElection      bool
+	EnableMetricsRecorder     bool
+	MetricsAddr               string
+	Namespace                 string
+	OperatorName              string
+	ParameterSecretname       string
+	PprofAddr                 string
+	ProbeAddr                 string
+	StatusControllerName      string
+	StatusControllerNamespace string
+	RetryAfterTime            time.Duration
+	Zap                       zap.Options
 }
 
 func (o *options) Process() error {
@@ -94,6 +98,26 @@ func (o *options) processFlags() {
 		"health-probe-bind-address",
 		o.ProbeAddr,
 		"The address the probe endpoint binds to.",
+	)
+
+	flags.StringVar(
+		&o.StatusControllerName,
+		"addon-instance-name",
+		o.StatusControllerName,
+		"The name of addon instance operator.",
+	)
+
+	flags.StringVar(
+		&o.StatusControllerNamespace,
+		"addon-instance-namespace",
+		o.StatusControllerNamespace,
+		"The namespace addon instance exists in.",
+	)
+
+	flags.Duration(
+		"retry-after-time",
+		o.RetryAfterTime,
+		"Time between retries for addon instance",
 	)
 
 	o.Zap.BindFlags(flags)

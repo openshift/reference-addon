@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -23,12 +24,15 @@ import (
 
 func main() {
 	opts := options{
-		DeleteLabel:           "api.openshift.com/addon-reference-addon-delete",
-		EnableMetricsRecorder: true,
-		MetricsAddr:           ":8080",
-		OperatorName:          "reference-addon",
-		ParameterSecretname:   "addon-reference-addon-parameters",
-		ProbeAddr:             ":8081",
+		DeleteLabel:               "api.openshift.com/addon-reference-addon-delete",
+		EnableMetricsRecorder:     true,
+		MetricsAddr:               ":8080",
+		OperatorName:              "reference-addon",
+		ParameterSecretname:       "addon-reference-addon-parameters",
+		ProbeAddr:                 ":8081",
+		StatusControllerName:      "addon-instance",
+		StatusControllerNamespace: "addon-instance-namespace",
+		RetryAfterTime:            10 * time.Second,
 		Zap: zap.Options{
 			Development: true,
 		},
@@ -133,8 +137,14 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	}
 
 	// status controller
-	statusctlr := addoninstance.NewStatusControllerReconciler(
+	statusctlr, err := addoninstance.NewStatusControllerReconciler(
 		client,
+		addoninstance.WithLog{Log: ctrl.Log.WithName("controller").WithName("addoninstance")},
+		addoninstance.WithStatusControllerNamespace(opts.StatusControllerNamespace),
+		addoninstance.WithStatusControllerName(opts.StatusControllerName),
+		addoninstance.WithReferenceAddonNamespace(opts.Namespace),
+		addoninstance.WithReferenceAddonName(opts.OperatorName),
+		addoninstance.WithRetryAfterTime(10),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing status controller: %w", err)
@@ -143,7 +153,6 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	if err := statusctlr.SetupWithManager(mgr); err != nil {
 		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
 	}
-	//TODO add the actual logic
 
 	return mgr, nil
 }

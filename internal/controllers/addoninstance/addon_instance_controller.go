@@ -27,7 +27,7 @@ type StatusControllerReconciler struct {
 }
 
 // Grabbing namespace/name needs to be an option
-func NewStatusControllerReconciler(client client.Client, opts ...StatusControllerReconcilerOption) *StatusControllerReconciler {
+func NewStatusControllerReconciler(client client.Client, opts ...StatusControllerReconcilerOption) (*StatusControllerReconciler, error) {
 	var cfg StatusControllerReconcilerConfig
 
 	cfg.Option(opts...)
@@ -37,7 +37,7 @@ func NewStatusControllerReconciler(client client.Client, opts ...StatusControlle
 		cfg:                 cfg,
 		client:              client,
 		addonInstanceClient: addoninstance.NewAddonInstanceClient(client),
-	}
+	}, nil
 }
 
 type StatusControllerReconcilerConfig struct {

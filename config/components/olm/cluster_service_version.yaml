@@ -4,9 +4,9 @@ metadata:
   annotations:
     repository: https://github.com/openshift/reference-addon
     support: "false"
-    containerImage: +REPLACE+
     capabilities: Full Lifecycle
-    olm.skipRange: +REPLACE+
+    containerImage: manager
+    olm.skipRange: <=v0.0.0
   name: reference-addon.v0.0.0
 spec:
   description: |-

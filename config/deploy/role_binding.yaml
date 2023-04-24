@@ -1,12 +1,11 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: reference-addon
-  namespace: redhat-reference-addon
+  name: operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: reference-addon
+  name: operator
 subjects:
 - kind: ServiceAccount
-  name: reference-addon
+  name: operator

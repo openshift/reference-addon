@@ -1,24 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: reference-addon
-  namespace: redhat-reference-addon
-  labels:
-    app.kubernetes.io/name: reference-addon
+  name: operator
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app.kubernetes.io/name: reference-addon
   template:
     metadata:
-      labels:
-        app.kubernetes.io/name: reference-addon
     spec:
-      serviceAccountName: reference-addon
+      serviceAccountName: operator
       containers:
       - name: manager
-        image: quay.io/openshift/reference-addon:latest
+        image: manager
         args:
         - --enable-leader-election
         livenessProbe:
@@ -40,3 +33,6 @@ spec:
           requests:
             cpu: 50m
             memory: 32Mi
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true

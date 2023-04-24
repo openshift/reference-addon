@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +22,8 @@ import (
 	"github.com/mt-sre/go-ci/container"
 	"github.com/mt-sre/go-ci/git"
 	"github.com/mt-sre/go-ci/web"
+	cp "github.com/otiai10/copy"
+	"gopkg.in/yaml.v3"
 )
 
 var Aliases = map[string]interface{}{
@@ -43,7 +46,7 @@ func (All) CIDeps(ctx context.Context) {
 		Build.DownloadSource,
 		Deps.DownloadSource,
 		Deps.UpdateControllerGen,
-		Deps.UpdateYQ,
+		Deps.UpdateKustomize,
 		Deps.UpdateGolangCILint,
 		Deps.UpdateGinkgo,
 		Deps.UpdateSetupEnvtest,
@@ -77,8 +80,6 @@ func (All) Generate(ctx context.Context) {
 		ctx,
 		Generate.Manifests,
 		Generate.Boilerplate,
-		Generate.OperatorDeployment,
-		Generate.ClusterServiceVersion,
 	)
 }
 
@@ -139,7 +140,7 @@ var _version = func() string {
 		panic(err)
 	}
 
-	return latest+"-"+_shortSHA
+	return latest + "-" + _shortSHA
 }()
 
 var _branch = func() string {
@@ -172,7 +173,7 @@ var _managerImageReference = func() string {
 		org = val
 	}
 
-	repo:= defaultRepo
+	repo := defaultRepo
 	if val, ok := os.LookupEnv("IMAGE_REPO"); ok {
 		repo = val
 	}
@@ -230,19 +231,19 @@ func (Deps) UpdateGolangCILint(ctx context.Context) {
 	)
 }
 
+// UpdateKustomize updates the cached yq binary.
+func (Deps) UpdateKustomize(ctx context.Context) {
+	mg.CtxDeps(
+		ctx,
+		mg.F(updateGODependency, "sigs.k8s.io/kustomize/kustomize/v4"),
+	)
+}
+
 // UpdateSetupEnvtest updates the cached setup-envtest binary.
 func (Deps) UpdateSetupEnvtest(ctx context.Context) {
 	mg.CtxDeps(
 		ctx,
 		mg.F(updateGODependency, "sigs.k8s.io/controller-runtime/tools/setup-envtest"),
-	)
-}
-
-// UpdateYQ updates the cached yq binary.
-func (Deps) UpdateYQ(ctx context.Context) {
-	mg.CtxDeps(
-		ctx,
-		mg.F(updateGODependency, "github.com/mikefarah/yq/v4"),
 	)
 }
 
@@ -612,7 +613,7 @@ func (Test) Integration(ctx context.Context) error {
 	if !usingExistingCluster() {
 		var err error
 
-		assetsDir, err = setupEnvTest(ctx, _depBin, "1.22.x!")
+		assetsDir, err = setupEnvTest(ctx, _depBin, "1.26.x!")
 		if err != nil {
 			return fmt.Errorf("setting up env-test: %w", err)
 		}
@@ -743,72 +744,6 @@ func (Generate) Boilerplate(ctx context.Context) error {
 
 var controllerGen = command.NewCommandAlias(filepath.Join(_depBin, "controller-gen"))
 
-// OperatorDeployment applies templated values to
-// the manager OperatorDeployment.
-func (Generate) OperatorDeployment(ctx context.Context) {
-	var (
-		template = filepath.Join(_projectRoot, "config", "templates", "operator.tpl.yaml")
-		out      = filepath.Join(_projectRoot, "config", "deploy", "operator.yaml")
-	)
-
-	mg.CtxDeps(
-		ctx,
-		mg.F(yqEval, template, out,
-			fmt.Sprintf(".spec.template.spec.containers[0].image = %q", _taggedManagerImage),
-		),
-	)
-}
-
-// ClusterServiceVersion applies templated values to
-// the operator ClusterServiceVersion.
-func (Generate) ClusterServiceVersion(ctx context.Context) {
-	var (
-		skipRange = "<=" + strings.TrimPrefix(_version, "v")
-		template  = filepath.Join(_projectRoot, "config", "templates", "reference-addon.csv.tpl.yaml")
-		out       = filepath.Join(_projectRoot, "config", "deploy", "reference-addon.csv.yaml")
-	)
-
-	mg.CtxDeps(
-		ctx,
-		mg.F(yqEval, template, out,
-			fmt.Sprintf(".metadata.annotations.containerImage = %q", _taggedManagerImage),
-			fmt.Sprintf(`.metadata.annotations."olm.skipRange" = %q`, skipRange),
-		),
-	)
-}
-
-func yqEval(ctx context.Context, template, out string, exprs ...string) error {
-	mg.CtxDeps(
-		ctx,
-		Deps.UpdateYQ,
-	)
-
-	expressions := strings.Join(exprs, " | ")
-
-	eval := yq(
-		command.WithContext{Context: ctx},
-		command.WithArgs{"eval", expressions, template},
-	)
-
-	if err := eval.Run(); err != nil {
-		return fmt.Errorf("starting to evaluting template %q: %w", template, err)
-	}
-
-	if !eval.Success() {
-		return fmt.Errorf("evaluating template %q: %w", template, eval.Error())
-	}
-
-	const perms = fs.FileMode(0644)
-
-	if err := os.WriteFile(out, []byte(eval.Stdout()), perms); err != nil {
-		return fmt.Errorf("writing file %q: %w", out, err)
-	}
-
-	return nil
-}
-
-var yq = command.NewCommandAlias(filepath.Join(_depBin, "yq"))
-
 // Bundle generates bundle artifacts.
 func (Generate) Bundle(ctx context.Context) error {
 	mg.CtxDeps(
@@ -818,6 +753,11 @@ func (Generate) Bundle(ctx context.Context) error {
 		All.Generate,
 	)
 
+	olmResources, err := buildOLMResources(ctx)
+	if err != nil {
+		return fmt.Errorf("building OLM resources: %w", err)
+	}
+
 	version := strings.TrimPrefix(_version, "v")
 
 	gen := operatorSDK(
@@ -826,11 +766,12 @@ func (Generate) Bundle(ctx context.Context) error {
 		command.WithArgs{
 			"generate", "bundle",
 			"--package", "reference-addon",
-			"--input-dir", filepath.Join("config", "deploy"),
 			"--version", version,
-			"--default-channel", "alpha",
+			"--channels", "beta",
+			"--default-channel", "beta",
 			"--use-image-digests",
 		},
+		command.WithStdin{Reader: bytes.NewBufferString(olmResources)},
 	)
 
 	if err := gen.Run(); err != nil {
@@ -845,6 +786,121 @@ func (Generate) Bundle(ctx context.Context) error {
 }
 
 var operatorSDK = command.NewCommandAlias(filepath.Join(_depBin, "operator-sdk"))
+
+func buildOLMResources(ctx context.Context) (string, error) {
+	mg.CtxDeps(
+		ctx,
+		Deps.UpdateKustomize,
+	)
+
+	temp, err := os.MkdirTemp("", fmt.Sprintf("reference-addon-apply-dev-*"))
+	if err != nil {
+		return "", fmt.Errorf("creating temp dir: %w", err)
+	}
+
+	if err := cp.Copy(filepath.Join(_projectRoot, "config"), temp); err != nil {
+		return "", fmt.Errorf("copying 'config' to temp directory: %w", err)
+	}
+
+	defer func() { _ = sh.Rm(temp) }()
+
+	olmOverlay := filepath.Join(temp, "overlays", "olm")
+
+	if err := patchOLMSkipRange(filepath.Join(olmOverlay, "cluster_service_version_patch.yaml"), "<=" + strings.TrimPrefix(_version, "v")); err != nil {
+		return "", fmt.Errorf("patching skip range: %w", err)
+	}
+
+	if err := kustomizeSetImage(ctx, olmOverlay, _taggedManagerImage); err != nil {
+		return "", fmt.Errorf("setting manager image: %w", err)
+	}
+
+	out, err := kustomizeBuild(ctx, olmOverlay)
+	if err != nil {
+		return "", fmt.Errorf("building olm overlay: %s", err)
+	}
+
+	return out, nil
+}
+
+func patchOLMSkipRange(patchFile string, skipRange string) error {
+	data, err := os.ReadFile(patchFile)
+	if err != nil {
+		return err
+	}
+
+	var csvMeta struct {
+		Kind       string
+		APIVersion string `yaml:"apiVersion"`
+		Metadata   struct {
+			Name        string
+			Annotations map[string]string
+		}
+	}
+
+	if err := yaml.Unmarshal(data, &csvMeta); err != nil {
+		return err
+	}
+
+	if csvMeta.Metadata.Annotations == nil {
+		csvMeta.Metadata.Annotations = make(map[string]string)
+	}
+
+	csvMeta.Metadata.Annotations["olm.skipRange"] = skipRange
+
+	csvMetaBytes, err := yaml.Marshal(&csvMeta)
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(patchFile, csvMetaBytes, os.FileMode(00644)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func kustomizeBuild(ctx context.Context, dir string) (string, error) {
+	build := kustomize(
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithArgs{"build"},
+		command.WithWorkingDirectory(dir),
+	)
+
+	if err := build.Run(); err != nil {
+		return "", fmt.Errorf("starting to build directory: %w", err)
+	}
+
+	if !build.Success() {
+		return "", fmt.Errorf("building directory: %w", build.Error())
+	}
+
+	return build.Stdout(), nil
+}
+
+func kustomizeSetImage(ctx context.Context, dir, image string) error {
+	setImage := kustomize(
+		command.WithContext{Context: ctx},
+		command.WithConsoleOut(mg.Verbose()),
+		command.WithArgs{
+			"edit", "set", "image", fmt.Sprintf("manager=%s", image),
+		},
+		command.WithWorkingDirectory(dir),
+	)
+
+	if err := setImage.Run(); err != nil {
+		return fmt.Errorf("starting to set image: %w", err)
+	}
+
+	if !setImage.Success() {
+		return fmt.Errorf("setting image: %w", setImage.Error())
+	}
+
+	return nil
+}
+
+var kustomize = command.NewCommandAlias(filepath.Join(_depBin, "kustomize"))
+
 
 // Clean removes left over bundle artifacts.
 func (Release) Clean() error {

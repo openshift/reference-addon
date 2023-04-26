@@ -11,19 +11,19 @@ import (
 )
 
 type options struct {
-	DeleteLabel               string
-	EnableLeaderElection      bool
-	EnableMetricsRecorder     bool
-	MetricsAddr               string
-	Namespace                 string
-	OperatorName              string
-	ParameterSecretname       string
-	PprofAddr                 string
-	ProbeAddr                 string
-	StatusControllerName      string
-	StatusControllerNamespace string
-	RetryAfterTime            time.Duration
-	Zap                       zap.Options
+	DeleteLabel            string
+	EnableLeaderElection   bool
+	EnableMetricsRecorder  bool
+	MetricsAddr            string
+	Namespace              string
+	OperatorName           string
+	ParameterSecretname    string
+	PprofAddr              string
+	ProbeAddr              string
+	AddonInstanceName      string
+	AddonInstanceNamespace string
+	RetryAfterTime         time.Duration
+	Zap                    zap.Options
 }
 
 func (o *options) Process() error {
@@ -101,16 +101,16 @@ func (o *options) processFlags() {
 	)
 
 	flags.StringVar(
-		&o.StatusControllerName,
+		&o.AddonInstanceName,
 		"addon-instance-name",
-		o.StatusControllerName,
+		o.AddonInstanceName,
 		"The name of addon instance operator.",
 	)
 
 	flags.StringVar(
-		&o.StatusControllerNamespace,
+		&o.AddonInstanceNamespace,
 		"addon-instance-namespace",
-		o.StatusControllerNamespace,
+		o.AddonInstanceNamespace,
 		"The namespace addon instance exists in.",
 	)
 

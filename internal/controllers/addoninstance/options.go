@@ -12,16 +12,16 @@ func (w WithLog) ConfigureStatusControllerReconciler(c *StatusControllerReconcil
 	c.Log = w.Log
 }
 
-type WithStatusControllerNamespace string
+type WithAddonInstanceNamespace string
 
-func (w WithStatusControllerNamespace) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.StatusControllerNamespace = string(w)
+func (w WithAddonInstanceNamespace) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
+	c.AddonInstanceNamespace = string(w)
 }
 
-type WithStatusControllerName string
+type WithAddonInstanceName string
 
-func (w WithStatusControllerName) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.StatusControllerName = string(w)
+func (w WithAddonInstanceName) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
+	c.AddonInstanceName = string(w)
 }
 
 type WithReferenceAddonNamespace string

@@ -140,8 +140,8 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	statusctlr, statuserr := addoninstance.NewStatusControllerReconciler(
 		client,
 		addoninstance.WithLog{Log: ctrl.Log.WithName("controller").WithName("addoninstance")},
-		addoninstance.WithStatusControllerNamespace(opts.StatusControllerNamespace),
-		addoninstance.WithStatusControllerName(opts.StatusControllerName),
+		addoninstance.WithAddonInstanceNamespace(opts.StatusControllerNamespace),
+		addoninstance.WithAddonInstanceName(opts.StatusControllerName),
 		addoninstance.WithReferenceAddonNamespace(opts.Namespace),
 		addoninstance.WithReferenceAddonName(opts.OperatorName),
 		addoninstance.WithRetryAfterTime(opts.RetryAfterTime),

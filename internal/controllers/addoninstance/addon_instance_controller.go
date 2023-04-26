@@ -46,12 +46,12 @@ func NewStatusControllerReconciler(client client.Client, opts ...StatusControlle
 }
 
 type StatusControllerReconcilerConfig struct {
-	Log                       logr.Logger
-	StatusControllerNamespace string
-	StatusControllerName      string
-	ReferenceAddonNamespace   string
-	ReferenceAddonName        string
-	RetryAfterTime            time.Duration
+	Log                     logr.Logger
+	AddonInstanceNamespace  string
+	AddonInstanceName       string
+	ReferenceAddonNamespace string
+	ReferenceAddonName      string
+	RetryAfterTime          time.Duration
 }
 
 type StatusControllerReconcilerOption interface {
@@ -78,8 +78,8 @@ func (c *StatusControllerReconcilerConfig) Default() {
 func (r *StatusControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	//desired := r.desiredReferenceAddon()
 	requestObject := types.NamespacedName{
-		Name:      r.cfg.StatusControllerName,
-		Namespace: r.cfg.StatusControllerNamespace,
+		Name:      r.cfg.AddonInstanceName,
+		Namespace: r.cfg.AddonInstanceNamespace,
 	}
 
 	statusControllerHandler := handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
@@ -134,8 +134,8 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 
 	// Create addon instance key
 	statusControllerKey := client.ObjectKey{
-		Namespace: s.cfg.StatusControllerNamespace,
-		Name:      s.cfg.StatusControllerName,
+		Namespace: s.cfg.AddonInstanceNamespace,
+		Name:      s.cfg.AddonInstanceName,
 	}
 
 	// Obtain current addon instance

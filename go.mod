@@ -1,6 +1,6 @@
 module github.com/openshift/reference-addon
 
-go 1.18
+go 1.19
 
 require (
 	github.com/go-logr/logr v1.2.4
@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega v1.27.6
 	github.com/openshift/addon-operator v1.8.5
-	github.com/openshift/addon-operator/apis v0.0.0-20230426134104-ac814e060dda
+	github.com/openshift/addon-operator/apis v0.0.0-20230426173708-170d8d64e051
 	github.com/operator-framework/api v0.17.5
 	github.com/otiai10/copy v1.11.0
 	github.com/prometheus/client_golang v1.15.0

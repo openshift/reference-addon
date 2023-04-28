@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	internaltesting "github.com/openshift/reference-addon/internal/testing"
+	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,4 +86,28 @@ func remove(path string) error {
 	}
 
 	return os.Remove(path)
+}
+
+func addonParameterSecret(name, ns string) corev1.Secret {
+	return corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+	}
+}
+
+func addonNetworkPolicy(name, ns string) netv1.NetworkPolicy {
+	return netv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: netv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			PolicyTypes: []netv1.PolicyType{
+				netv1.PolicyTypeIngress,
+			},
+		},
+	}
 }

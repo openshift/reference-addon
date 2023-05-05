@@ -46,7 +46,8 @@ func NewStatusControllerReconciler(client client.Client, opts ...StatusControlle
 }
 
 type StatusControllerReconcilerConfig struct {
-	Log                     logr.Logger
+	Log logr.Logger
+
 	AddonInstanceNamespace  string
 	AddonInstanceName       string
 	ReferenceAddonNamespace string

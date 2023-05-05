@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
@@ -108,6 +109,15 @@ func addonNetworkPolicy(name, ns string) netv1.NetworkPolicy {
 			PolicyTypes: []netv1.PolicyType{
 				netv1.PolicyTypeIngress,
 			},
+		},
+	}
+}
+
+func addonInstanceObject(name, ns string) addonsv1alpha1.Addon {
+	return addonsv1alpha1.Addon{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
 		},
 	}
 }

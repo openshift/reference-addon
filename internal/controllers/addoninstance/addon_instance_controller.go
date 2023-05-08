@@ -112,12 +112,12 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 
 	//Build reference-addon constructor with options to grab namespace/name (do it for Addon-instance as well)
 	// Obtain current reference addon state
-	log.Info("find reference addon: ", referenceAddonKey.Namespace, referenceAddonKey.Name)
+	log.Info("find reference addon", "namespace", referenceAddonKey.Namespace, "name", referenceAddonKey.Name)
 	referenceAddon := &rv1alpha1.ReferenceAddon{}
 	if err := s.client.Get(ctx, referenceAddonKey, referenceAddon); err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting Reference-Addon Object'%s/%s': %w", referenceAddonKey.Namespace, referenceAddonKey.Name, err)
 	}
-	log.Info("found reference addon: ", referenceAddon)
+	log.Info("found reference addon: ", "namespace", referenceAddonKey.Namespace, "name", referenceAddonKey.Name)
 
 	// Intialize conditions slice
 	var conditions []metav1.Condition
@@ -140,12 +140,12 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 	}
 
 	// Obtain current addon instance
-	log.Info("find addon instance: ", statusControllerKey.Namespace, statusControllerKey.Name)
+	log.Info("getting addon instance", "namespace", statusControllerKey.Namespace, "name", statusControllerKey.Name)
 	addonInstance := &av1alpha1.AddonInstance{}
 	if err := s.client.Get(ctx, statusControllerKey, addonInstance); err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting AddonInstance Object'%s/%s': %w", statusControllerKey.Namespace, statusControllerKey.Name, err)
 	}
-	log.Info("found addon instance: ", addonInstance)
+	log.Info("found addon instance", "namespace", statusControllerKey.Namespace, "name", statusControllerKey.Name)
 
 	// Send Pulse to addon operator to report health of reference addon
 	err := s.addonInstanceClient.SendPulse(ctx, *addonInstance, addoninstance.WithConditions(conditions))

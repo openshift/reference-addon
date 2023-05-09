@@ -113,8 +113,8 @@ func addonNetworkPolicy(name, ns string) netv1.NetworkPolicy {
 	}
 }
 
-func addonInstanceObject(name, ns string) addonsv1alpha1.Addon {
-	return addonsv1alpha1.Addon{
+func addonInstanceObject(name, ns string) addonsv1alpha1.AddonInstance {
+	return addonsv1alpha1.AddonInstance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,

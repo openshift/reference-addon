@@ -110,7 +110,6 @@ var _ = BeforeSuite(func() {
 	)
 	Expect(err).ToNot(HaveOccurred())
 
-	// messing up here..?
 	configFile, err := os.CreateTemp("", "refernce-addon-integration-*")
 	Expect(err).ToNot(HaveOccurred())
 

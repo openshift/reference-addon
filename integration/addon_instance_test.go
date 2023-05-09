@@ -2,35 +2,55 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"time"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gexec"
+	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+	addoninstance "github.com/openshift/addon-operator/pkg/client"
+
+	//"github.com/openshift/reference-addon/internal/controllers/addoninstance"
 	internaltesting "github.com/openshift/reference-addon/internal/testing"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Apply Network Policies Phase", func() {
 	var (
-		ctx             context.Context
-		cancel          context.CancelFunc
+		ctx                  context.Context
+		cancel               context.CancelFunc
+		deleteLabel          string
+		deleteLabelGen       = nameGenerator("ref-test-label")
+		addonInstanceName    string
+		addonInstanceNameGen = nameGenerator("ai-test-name")
+		//addonInstanceNamespace string
+		//addonInstanceNamespaceGen = nameGenerator("ai-test-namespace")
 		namespace       string
-		namespaceGen    = nameGenerator("ai-test-namespace")
+		namespaceGen    = nameGenerator("ref-test-namespace")
 		operatorName    string
-		operatorNameGen = nameGenerator("ai-test-operator")
+		operatorNameGen = nameGenerator("ref-test-name")
 	)
 
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(context.Background())
 
+		addonInstanceName = addonInstanceNameGen()
+		deleteLabel = deleteLabelGen()
+		//addonInstanceNamespace = addonInstanceNamespaceGen()
 		namespace = namespaceGen()
 		operatorName = operatorNameGen()
 
 		By("Starting manager")
 
 		manager := exec.Command(_binPath,
+			"-addon-instance-name", addonInstanceName,
+			"-addon-instance-namespace", namespace,
 			"-namespace", namespace,
+			"-delete-label", deleteLabel,
 			"-operator-name", operatorName,
 			"-kubeconfig", _kubeConfigPath,
 		)
@@ -41,9 +61,11 @@ var _ = Describe("Apply Network Policies Phase", func() {
 		By("Creating the addon namespace")
 
 		ns := addonNamespace(namespace)
-		addonInstance := addonInstanceObject(operatorName, namespace)
+		//ains := addonNamespace(addonInstanceNamespace)
+		addonInstance := addonInstanceObject(addonInstanceName, namespace)
 
 		_client.Create(ctx, &ns)
+		//_client.Create(ctx, &ains)
 		_client.Create(ctx, &addonInstance)
 
 		rbac, err := getRBAC(namespace, managerGroup)
@@ -68,29 +90,39 @@ var _ = Describe("Apply Network Policies Phase", func() {
 		})
 	})
 
+	//Is addon instance available?
+	// check that there is an addonInstance in the target namespace.
 	When("Test starts", func() {
-		It("AddonInstance object should be available", func() {
-			addonInstance := addonInstanceObject(operatorName, namespace)
+		It("AddonInstance object should be created", func() {
+			addonInstance := addonInstanceObject(addonInstanceName, namespace)
 			_client.EventuallyObjectExists(ctx, &addonInstance, internaltesting.WithTimeout(10*time.Second))
+		})
+	})
+
+	When("Addon Instance Object Exists", func() {
+		Context("Reference Addon Status Available'", func() {
+			It("Addon Instance should report Availalbe condition", func() {
+				addonInstance := addonInstanceObject(addonInstanceName, namespace)
+				_client.EventuallyObjectExists(ctx, &addonInstance, internaltesting.WithTimeout(10*time.Second))
+
+				var conditions []metav1.Condition
+				conditions = append(conditions, addoninstance.NewAddonInstanceConditionInstalled(
+					"True",
+					av1alpha1.AddonInstanceInstalledReasonSetupComplete,
+					"All Components Available",
+				))
+				//Expect(addonInstance.Status.Conditions).To(Equal(conditions))
+				fmt.Printf("Conditions: %v\n", conditions)
+				print(meta.IsStatusConditionTrue(addonInstance.Status.Conditions, av1alpha1.Available))
+				fmt.Printf("Other Conditions: %v\n", addonInstance.Status.Conditions)
+				//print(addonInstance.Status.Conditions[0])
+				print("RESULT HEREREEREREEEEEEE")
+			})
 		})
 	})
 })
 
 //Tests needed
-
-//Is addon instance available?
-// check that there is an addonInstance in the target namespace.
-//When("Addon Instance is deployed", func() {
-//	It("Should be available", func() {
-//		addonInstance := &addonsv1alpha1.AddonInstance{}
-//		err := aiClient.Get(ctx, client.ObjectKey{
-//			Name:      AddonInstanceName,
-//			Namespace: addonInstanceNS,
-//		}, addonInstance)
-//		_client.EventuallyObjectExists(ctx)
-
-//secret := addonParameterSecret(parameterSecretName, namespace)
-//_client.EventuallyObjectDoesNotExist(ctx, &secret)
 
 // Check Default of 10s for AddonInstanceReconciler
 // Assert().Equal(10*time.Second, addonInstance.Spec.HeartbeatUpdatePeriod.Duration)

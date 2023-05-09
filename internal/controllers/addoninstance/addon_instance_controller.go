@@ -133,6 +133,16 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 		log.Info("Reference Addon Successfully Installed")
 	}
 
+	// Reference Addon not available
+	if !s.installed && meta.IsStatusConditionFalse(referenceAddon.Status.Conditions, string(rv1alpha1.ReferenceAddonConditionAvailable)) {
+		conditions = append(conditions, addoninstance.NewAddonInstanceConditionDegraded(
+			"False",
+			string(av1alpha1.AddonInstanceConditionDegraded),
+			"All Components Unavailable",
+		))
+		log.Info("Reference Addon Not Installed")
+	}
+
 	// Create addon instance key
 	statusControllerKey := client.ObjectKey{
 		Namespace: s.cfg.AddonInstanceNamespace,

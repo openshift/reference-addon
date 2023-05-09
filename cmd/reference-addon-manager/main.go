@@ -147,11 +147,11 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 		addoninstance.WithRetryAfterTime(opts.RetryAfterTime),
 	)
 	if statuserr != nil {
-		return nil, fmt.Errorf("initializing status controller: %w", statuserr)
+		return nil, fmt.Errorf("initializing addon instance controller: %w", statuserr)
 	}
 
 	if statuserr := statusctlr.SetupWithManager(mgr); statuserr != nil {
-		return nil, fmt.Errorf("setting up reference addon controller: %w", statuserr)
+		return nil, fmt.Errorf("setting up addon instance controller: %w", statuserr)
 	}
 
 	return mgr, nil

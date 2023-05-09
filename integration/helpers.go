@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+	//"github.com/openshift/reference-addon/internal/controllers/addoninstance"
 	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"

@@ -24,15 +24,15 @@ import (
 
 func main() {
 	opts := options{
-		DeleteLabel:            "api.openshift.com/addon-reference-addon-delete",
-		EnableMetricsRecorder:  true,
-		MetricsAddr:            ":8080",
-		OperatorName:           "reference-addon",
-		ParameterSecretname:    "addon-reference-addon-parameters",
-		ProbeAddr:              ":8081",
-		AddonInstanceName:      "addon-instance",
-		AddonInstanceNamespace: "addon-instance-namespace",
-		RetryAfterTime:         10 * time.Second,
+		DeleteLabel:           "api.openshift.com/addon-reference-addon-delete",
+		EnableMetricsRecorder: true,
+		MetricsAddr:           ":8080",
+		OperatorName:          "reference-addon",
+		ParameterSecretname:   "addon-reference-addon-parameters",
+		ProbeAddr:             ":8081",
+		AddonInstanceName:     "addon-instance",
+		//AddonInstanceNamespace: "addon-instance-namespace",
+		RetryAfterTime: 10 * time.Second,
 		Zap: zap.Options{
 			Development: true,
 		},
@@ -140,7 +140,7 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	statusctlr, statuserr := addoninstance.NewStatusControllerReconciler(
 		client,
 		addoninstance.WithLog{Log: ctrl.Log.WithName("controller").WithName("addoninstance")},
-		addoninstance.WithAddonInstanceNamespace(opts.AddonInstanceNamespace),
+		addoninstance.WithAddonInstanceNamespace(opts.Namespace),
 		addoninstance.WithAddonInstanceName(opts.AddonInstanceName),
 		addoninstance.WithReferenceAddonNamespace(opts.Namespace),
 		addoninstance.WithReferenceAddonName(opts.OperatorName),

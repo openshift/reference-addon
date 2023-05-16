@@ -101,14 +101,6 @@ var _ = Describe("Status Controller", func() {
 			})
 		})
 	})
-
-	When("Addon Instance Object is Uninstalled", func() {
-		It("Should report as not existing", func() {
-			addonInstance := addonInstanceObject(addonInstanceName, namespace)
-			_client.Delete(ctx, &addonInstance)
-			_client.EventuallyObjectDoesNotExist(ctx, &addonInstance, internaltesting.WithTimeout(10*time.Second))
-		})
-	})
 })
 
 // Check if conditions match

@@ -155,10 +155,6 @@ func (s *StatusControllerReconciler) Reconcile(ctx context.Context, req reconcil
 	if err := s.client.Get(ctx, statusControllerKey, addonInstance); err != nil {
 		return ctrl.Result{}, fmt.Errorf("getting AddonInstance Object'%s/%s': %w", statusControllerKey.Namespace, statusControllerKey.Name, err)
 	}
-	//else {
-	//	addonInstance.Status.Conditions = conditions
-	//	s.client.Update(ctx, addonInstance)
-	//}
 	log.Info("found addon instance", "namespace", statusControllerKey.Namespace, "name", statusControllerKey.Name)
 
 	// Send Pulse to addon operator to report health of reference addon

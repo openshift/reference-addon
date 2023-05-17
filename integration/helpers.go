@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	addonsv1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
+	//"github.com/openshift/reference-addon/internal/controllers/addoninstance"
 	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,4 +86,13 @@ func remove(path string) error {
 	}
 
 	return os.Remove(path)
+}
+
+func addonInstanceObject(name, ns string) addonsv1alpha1.AddonInstance {
+	return addonsv1alpha1.AddonInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+	}
 }

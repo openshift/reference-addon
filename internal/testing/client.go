@@ -27,6 +27,10 @@ func (c *TestClient) Create(ctx context.Context, obj client.Object, opts ...Requ
 	}
 }
 
+func (c *TestClient) Get(ctx context.Context, obj client.Object, opts ...RequestOption) {
+	ExpectWithOffset(1, c.client.Get(ctx, client.ObjectKeyFromObject(obj), obj)).Should(Succeed())
+}
+
 func (c *TestClient) Update(ctx context.Context, obj client.Object, opts ...RequestOption) {
 	ExpectWithOffset(1, c.client.Update(ctx, obj)).Should(Succeed())
 }

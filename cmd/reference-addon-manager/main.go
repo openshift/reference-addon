@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -12,7 +13,9 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/go-logr/logr"
+	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	refapis "github.com/openshift/reference-addon/apis"
+	"github.com/openshift/reference-addon/internal/controllers/addoninstance"
 	ractrl "github.com/openshift/reference-addon/internal/controllers/referenceaddon"
 	"github.com/openshift/reference-addon/internal/metrics"
 	"github.com/openshift/reference-addon/internal/pprof"
@@ -27,6 +30,8 @@ func main() {
 		OperatorName:          "reference-addon",
 		ParameterSecretname:   "addon-reference-addon-parameters",
 		ProbeAddr:             ":8081",
+		AddonInstanceName:     "addon-instance",
+		RetryAfterTime:        10 * time.Second,
 		Zap: zap.Options{
 			Development: true,
 		},
@@ -130,6 +135,24 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
 	}
 
+	// status controller
+	statusctlr, statuserr := addoninstance.NewStatusControllerReconciler(
+		client,
+		addoninstance.WithLog{Log: ctrl.Log.WithName("controller").WithName("addoninstance")},
+		addoninstance.WithAddonInstanceNamespace(opts.Namespace),
+		addoninstance.WithAddonInstanceName(opts.AddonInstanceName),
+		addoninstance.WithReferenceAddonNamespace(opts.Namespace),
+		addoninstance.WithReferenceAddonName(opts.OperatorName),
+		addoninstance.WithRetryAfterTime(opts.RetryAfterTime),
+	)
+	if statuserr != nil {
+		return nil, fmt.Errorf("initializing addon instance controller: %w", statuserr)
+	}
+
+	if statuserr := statusctlr.SetupWithManager(mgr); statuserr != nil {
+		return nil, fmt.Errorf("setting up addon instance controller: %w", statuserr)
+	}
+
 	return mgr, nil
 }
 
@@ -146,6 +169,14 @@ func initializeScheme() (*runtime.Scheme, error) {
 
 	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("adding Operators v1alpha1 APIs to scheme :%w", err)
+	}
+
+	if err := av1alpha1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("adding addon-operator v1alpha1 APIs to scheme :%w", err)
+	}
+
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("adding client-go APIs to scheme :%w", err)
 	}
 
 	return scheme, nil

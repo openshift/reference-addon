@@ -1,4 +1,4 @@
-package addoninstance
+package status
 
 import (
 	"time"
@@ -36,8 +36,8 @@ func (w WithReferenceAddonName) ConfigureStatusControllerReconciler(c *StatusCon
 	c.ReferenceAddonName = string(w)
 }
 
-type WithRetryAfterTime int
+type WithHeartbeatInterval time.Duration
 
-func (w WithRetryAfterTime) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
-	c.RetryAfterTime = time.Duration(w)
+func (w WithHeartbeatInterval) ConfigureStatusControllerReconciler(c *StatusControllerReconcilerConfig) {
+	c.HeartBeatInterval = time.Duration(w)
 }

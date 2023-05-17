@@ -22,13 +22,14 @@ type options struct {
 	ProbeAddr              string
 	AddonInstanceName      string
 	AddonInstanceNamespace string
-	RetryAfterTime         time.Duration
+	HeartbeatInterval      time.Duration
 	Zap                    zap.Options
 }
 
 func (o *options) Process() error {
 	o.processFlags()
 	o.processSecrets()
+	o.applyValuesFromOptions()
 
 	return o.validate()
 }
@@ -114,10 +115,11 @@ func (o *options) processFlags() {
 		"The namespace addon instance exists in.",
 	)
 
-	flags.Duration(
-		"retry-after-time",
-		o.RetryAfterTime,
-		"Time between retries for addon instance",
+	flags.DurationVar(
+		&o.HeartbeatInterval,
+		"heartbeat-interval",
+		o.HeartbeatInterval,
+		"Time between heartbeats sent to addon instance",
 	)
 
 	o.Zap.BindFlags(flags)
@@ -140,6 +142,12 @@ func (o *options) processSecrets() {
 
 	if o.Namespace == "" {
 		o.Namespace = namespace
+	}
+}
+
+func (o *options) applyValuesFromOptions() {
+	if o.AddonInstanceNamespace == "" {
+		o.AddonInstanceNamespace = o.Namespace
 	}
 }
 

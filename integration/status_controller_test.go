@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"time"
 
@@ -27,6 +28,7 @@ var _ = Describe("Status Controller", func() {
 		namespaceGen         = nameGenerator("ref-test-namespace")
 		operatorName         string
 		operatorNameGen      = nameGenerator("ref-test-name")
+		heartbeatInterval    = 1 * time.Second
 	)
 
 	BeforeEach(func() {
@@ -46,6 +48,7 @@ var _ = Describe("Status Controller", func() {
 			"-delete-label", deleteLabel,
 			"-operator-name", operatorName,
 			"-kubeconfig", _kubeConfigPath,
+			"-heartbeat-interval", heartbeatInterval.String(),
 		)
 
 		session, err := Start(manager, GinkgoWriter, GinkgoWriter)
@@ -98,6 +101,10 @@ var _ = Describe("Status Controller", func() {
 
 					return addonInstance.Status.Conditions
 				}, 10*time.Second).Should(ContainElements(EqualCondition(expectedCondition)))
+
+				fmt.Printf("%+v\n", addonInstance)
+
+				Expect(addonInstance.Spec.HeartbeatUpdatePeriod.Duration).To(Equal(heartbeatInterval))
 			})
 		})
 	})

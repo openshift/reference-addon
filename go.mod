@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/go-logr/logr v1.2.4
-	github.com/magefile/mage v1.14.0
+	github.com/magefile/mage v1.15.0
 	github.com/mt-sre/go-ci v0.6.5
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.6
@@ -12,7 +12,7 @@ require (
 	github.com/openshift/addon-operator/apis v0.0.0-20230505081548-bce54f373482
 	github.com/operator-framework/api v0.17.5
 	github.com/otiai10/copy v1.11.0
-	github.com/prometheus/client_golang v1.15.0
+	github.com/prometheus/client_golang v1.15.1
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.11.0
 	gopkg.in/yaml.v3 v3.0.1

@@ -40,15 +40,12 @@ rules:
   resources:
   - addoninstances
   - addoninstances/status
-  - addoninstances/finalizers
   verbs:
   - get
   - watch
   - list
-  - create
-  - update
   - patch
-  - delete
+  - update
 - apiGroups:
   - ""
   resources:

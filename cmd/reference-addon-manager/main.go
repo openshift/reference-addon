@@ -15,8 +15,8 @@ import (
 	"github.com/go-logr/logr"
 	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	refapis "github.com/openshift/reference-addon/apis"
-	"github.com/openshift/reference-addon/internal/controllers/addoninstance"
 	ractrl "github.com/openshift/reference-addon/internal/controllers/referenceaddon"
+	"github.com/openshift/reference-addon/internal/controllers/status"
 	"github.com/openshift/reference-addon/internal/metrics"
 	"github.com/openshift/reference-addon/internal/pprof"
 	opsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -31,7 +31,7 @@ func main() {
 		ParameterSecretname:   "addon-reference-addon-parameters",
 		ProbeAddr:             ":8081",
 		AddonInstanceName:     "addon-instance",
-		RetryAfterTime:        10 * time.Second,
+		HeartbeatInterval:     10 * time.Second,
 		Zap: zap.Options{
 			Development: true,
 		},
@@ -135,22 +135,21 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 		return nil, fmt.Errorf("setting up reference addon controller: %w", err)
 	}
 
-	// status controller
-	statusctlr, statuserr := addoninstance.NewStatusControllerReconciler(
+	statusctlr, err := status.NewStatusControllerReconciler(
 		client,
-		addoninstance.WithLog{Log: ctrl.Log.WithName("controller").WithName("addoninstance")},
-		addoninstance.WithAddonInstanceNamespace(opts.Namespace),
-		addoninstance.WithAddonInstanceName(opts.AddonInstanceName),
-		addoninstance.WithReferenceAddonNamespace(opts.Namespace),
-		addoninstance.WithReferenceAddonName(opts.OperatorName),
-		addoninstance.WithRetryAfterTime(opts.RetryAfterTime),
+		status.WithLog{Log: ctrl.Log.WithName("controller").WithName("status")},
+		status.WithAddonInstanceNamespace(opts.AddonInstanceNamespace),
+		status.WithAddonInstanceName(opts.AddonInstanceName),
+		status.WithReferenceAddonNamespace(opts.Namespace),
+		status.WithReferenceAddonName(opts.OperatorName),
+		status.WithHeartbeatInterval(opts.HeartbeatInterval),
 	)
-	if statuserr != nil {
-		return nil, fmt.Errorf("initializing addon instance controller: %w", statuserr)
+	if err != nil {
+		return nil, fmt.Errorf("initializing status controller: %w", err)
 	}
 
-	if statuserr := statusctlr.SetupWithManager(mgr); statuserr != nil {
-		return nil, fmt.Errorf("setting up addon instance controller: %w", statuserr)
+	if err := statusctlr.SetupWithManager(mgr); err != nil {
+		return nil, fmt.Errorf("setting up status controller: %w", err)
 	}
 
 	return mgr, nil

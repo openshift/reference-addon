@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
 	refapis "github.com/openshift/reference-addon/apis"
 	internaltesting "github.com/openshift/reference-addon/internal/testing"
 	olmcrds "github.com/operator-framework/api/crds"
@@ -53,6 +54,7 @@ var _ = BeforeSuite(func() {
 	Expect(clientgoscheme.AddToScheme(scheme)).Should(Succeed())
 	Expect(opsv1alpha1.AddToScheme(scheme)).Should(Succeed())
 	Expect(refapis.AddToScheme(scheme)).Should(Succeed())
+	Expect(av1alpha1.AddToScheme(scheme)).Should(Succeed())
 
 	By("Starting test environment")
 
@@ -74,6 +76,7 @@ var _ = BeforeSuite(func() {
 		},
 		Paths: []string{
 			filepath.Join(root, "config", "deploy", "reference.addons.managed.openshift.io_referenceaddons.yaml"),
+			filepath.Join(root, "config", "deploy", "addons.managed.openshift.io_addoninstances.yaml"),
 		},
 		Scheme: scheme,
 	})

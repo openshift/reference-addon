@@ -36,6 +36,20 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - addons.managed.openshift.io
+  resources:
+  - addoninstances
+  - addoninstances/status
+  - addoninstances/finalizers
+  verbs:
+  - get
+  - watch
+  - list
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - ""
   resources:
   - configmaps

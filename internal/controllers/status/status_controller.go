@@ -21,7 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 type StatusControllerReconciler struct {
@@ -76,13 +75,12 @@ func (c *StatusControllerReconcilerConfig) Default() {
 
 // Watch reference addon actions to trigger addon instance
 func (r *StatusControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	//desired := r.desiredReferenceAddon()
 	requestObject := types.NamespacedName{
 		Name:      r.cfg.AddonInstanceName,
 		Namespace: r.cfg.AddonInstanceNamespace,
 	}
 
-	statusControllerHandler := handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
+	referenceAddonHandler := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{
 			{
 				NamespacedName: requestObject,
@@ -92,8 +90,8 @@ func (r *StatusControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&av1alpha1.AddonInstance{}).
 		Watches(
-			&source.Kind{Type: &rv1alpha1.ReferenceAddon{}},
-			statusControllerHandler,
+			&rv1alpha1.ReferenceAddon{},
+			referenceAddonHandler,
 			builder.WithPredicates(controllers.HasNamePrefix(r.cfg.ReferenceAddonName)),
 		).
 		Complete(r)

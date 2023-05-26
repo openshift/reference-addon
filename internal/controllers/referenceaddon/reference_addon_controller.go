@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	refv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
 	"github.com/openshift/reference-addon/internal/controllers"
@@ -179,7 +178,7 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Namespace: desired.Namespace,
 	}
 
-	refAddonHandler := handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
+	refAddonHandler := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{
 			{
 				NamespacedName: requestObject,
@@ -189,7 +188,7 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&refv1alpha1.ReferenceAddon{}).
-		Watches(
+		WatchesRawSource(
 			controllers.EnqueueObject(requestObject),
 			refAddonHandler,
 		).
@@ -198,17 +197,17 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(controllers.HasName(generateIngressPolicyName(r.cfg.OperatorName))),
 		).
 		Watches(
-			&source.Kind{Type: &opsv1alpha1.ClusterServiceVersion{}},
+			&opsv1alpha1.ClusterServiceVersion{},
 			refAddonHandler,
 			builder.WithPredicates(controllers.HasNamePrefix(r.cfg.OperatorName)),
 		).
 		Watches(
-			&source.Kind{Type: &corev1.ConfigMap{}},
+			&corev1.ConfigMap{},
 			refAddonHandler,
 			builder.WithPredicates(controllers.HasName(r.cfg.OperatorName)),
 		).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			refAddonHandler,
 			builder.WithPredicates(controllers.HasName(r.cfg.AddonParameterSecretname)),
 		).

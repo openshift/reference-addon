@@ -13,7 +13,7 @@ require (
 	github.com/operator-framework/api v0.17.5
 	github.com/otiai10/copy v1.11.0
 	github.com/prometheus/client_golang v1.15.1
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.27.2

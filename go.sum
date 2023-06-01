@@ -137,8 +137,8 @@ github.com/openshift/addon-operator v1.10.1 h1:wHV9t2+a2o1uNEg4rWRUbn9Odq4uMeDfN
 github.com/openshift/addon-operator v1.10.1/go.mod h1:s2XyA2qM8K/lNov6uPHSSxAz+BNtwVbCKYZDV+f5Ghk=
 github.com/openshift/addon-operator/apis v0.0.0-20230505081548-bce54f373482 h1:381Vy6zmXaXXTOblOwoL6yw4oTI2LXxrDTKDkuoQJug=
 github.com/openshift/addon-operator/apis v0.0.0-20230505081548-bce54f373482/go.mod h1:cDMtOZx741HfmmUMmT09PWM8cOBxEJp3ipUHeHPr8F4=
-github.com/operator-framework/api v0.17.5 h1:9d0pc6m1Vp4QeS8i5dhl/B0nifhKQdtw+iFsNx0An0Q=
-github.com/operator-framework/api v0.17.5/go.mod h1:l/cuwtPxkVUY7fzYgdust2m9tlmb8I4pOvbsUufRb24=
+github.com/operator-framework/api v0.17.6 h1:E6+vlvYUKafvoXYtCuHlDZrXX4vl8AT+r93OxNlzjpU=
+github.com/operator-framework/api v0.17.6/go.mod h1:l/cuwtPxkVUY7fzYgdust2m9tlmb8I4pOvbsUufRb24=
 github.com/otiai10/copy v1.11.0 h1:OKBD80J/mLBrwnzXqGtFCzprFSGioo30JcmR4APsNwc=
 github.com/otiai10/copy v1.11.0/go.mod h1:rSaLseMUsZFFbsFGc7wCJnnkTAvdc5L6VWxPE4308Ww=
 github.com/otiai10/mint v1.5.1 h1:XaPLeE+9vGbuyEHem1JNk3bYc7KKqyI/na0/mLd/Kks=

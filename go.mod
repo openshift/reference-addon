@@ -8,7 +8,7 @@ require (
 	github.com/mt-sre/go-ci v0.6.5
 	github.com/onsi/ginkgo/v2 v2.9.7
 	github.com/onsi/gomega v1.27.7
-	github.com/openshift/addon-operator v1.10.1
+	github.com/openshift/addon-operator v1.12.0
 	github.com/openshift/addon-operator/apis v0.0.0-20230505081548-bce54f373482
 	github.com/operator-framework/api v0.17.6
 	github.com/otiai10/copy v1.11.0

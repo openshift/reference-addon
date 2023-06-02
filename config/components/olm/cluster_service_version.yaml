@@ -37,3 +37,7 @@ spec:
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
+  customresourcedefinitions:
+    owned:
+      - kind: ReferenceAddon
+        name: referenceaddons.reference.addons.managed.openshift.io

@@ -34,5 +34,11 @@ spec:
             cpu: 50m
             memory: 32Mi
         securityContext:
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault

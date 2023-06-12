@@ -357,9 +357,8 @@ func (b Build) Manager(ctx context.Context) error {
 		filepath.Join(_projectRoot, "cmd", "reference-addon-manager"),
 		filepath.Join("bin", "linux_amd64", "reference-addon-manager"),
 		withGoBuildArgs{
-			"CGO_ENABLED": "0",
-			"GOOS":        "linux",
-			"GOARCH":      "amd64",
+			"GOOS":   "linux",
+			"GOARCH": "amd64",
 		},
 		withLDFlags{
 			"-w",
@@ -806,7 +805,7 @@ func buildOLMResources(ctx context.Context) (string, error) {
 
 	olmOverlay := filepath.Join(temp, "overlays", "olm")
 
-	if err := patchOLMSkipRange(filepath.Join(olmOverlay, "cluster_service_version_patch.yaml"), "<=" + strings.TrimPrefix(_version, "v")); err != nil {
+	if err := patchOLMSkipRange(filepath.Join(olmOverlay, "cluster_service_version_patch.yaml"), "<="+strings.TrimPrefix(_version, "v")); err != nil {
 		return "", fmt.Errorf("patching skip range: %w", err)
 	}
 
@@ -900,7 +899,6 @@ func kustomizeSetImage(ctx context.Context, dir, image string) error {
 }
 
 var kustomize = command.NewCommandAlias(filepath.Join(_depBin, "kustomize"))
-
 
 // Clean removes left over bundle artifacts.
 func (Release) Clean() error {

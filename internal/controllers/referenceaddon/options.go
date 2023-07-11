@@ -16,6 +16,10 @@ func (w WithLog) ConfigurePhaseApplyNetworkPolicies(c *PhaseApplyNetworkPolicies
 	c.Log = w.Log
 }
 
+func (w WithLog) ConfigurePhaseSmokeTestRun(c *PhaseSmokeTestRunConfig) {
+	c.Log = w.Log
+}
+
 func (w WithLog) ConfigurePhaseUninstall(c *PhaseUninstallConfig) {
 	c.Log = w.Log
 }
@@ -114,4 +118,10 @@ type WithSampleURLs []string
 
 func (w WithSampleURLs) ConfigurePhaseSendDummyMetrics(c *PhaseSendDummyMetricsConfig) {
 	c.SampleURLs = []string(w)
+}
+
+type WithSmokeTester struct{ Tester SmokeTester }
+
+func (w WithSmokeTester) ConfigurePhaseSmokeTestRun(c *PhaseSmokeTestRunConfig) {
+	c.SmokeTester = w.Tester
 }

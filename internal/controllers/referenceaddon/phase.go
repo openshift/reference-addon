@@ -23,12 +23,14 @@ func NewPhaseRequestParameters(opts ...PhaseRequestParametersOption) PhaseReques
 
 	return PhaseRequestParameters{
 		applyNetworkPolicies: cfg.ApplyNetworkPolicies,
+		enableSmokeTest:      cfg.EnableSmokeTest,
 		size:                 cfg.Size,
 	}
 }
 
 type PhaseRequestParameters struct {
 	applyNetworkPolicies *bool
+	enableSmokeTest      *bool
 	size                 *string
 }
 
@@ -38,6 +40,14 @@ func (p *PhaseRequestParameters) GetSize() (string, bool) {
 	}
 
 	return *p.size, true
+}
+
+func (p *PhaseRequestParameters) GetEnableSmokeTest() (bool, bool) {
+	if p.enableSmokeTest == nil {
+		return false, false
+	}
+
+	return *p.enableSmokeTest, true
 }
 
 func (p *PhaseRequestParameters) GetApplyNetworkPolicies() (bool, bool) {
@@ -50,6 +60,7 @@ func (p *PhaseRequestParameters) GetApplyNetworkPolicies() (bool, bool) {
 
 type PhaseRequestParametersConfig struct {
 	ApplyNetworkPolicies *bool
+	EnableSmokeTest      *bool
 	Size                 *string
 }
 
@@ -63,6 +74,12 @@ type WithApplyNetworkPolicies struct{ Value *bool }
 
 func (w WithApplyNetworkPolicies) ConfigurePhaseRequestParameters(c *PhaseRequestParametersConfig) {
 	c.ApplyNetworkPolicies = w.Value
+}
+
+type WithEnableSmokeTest struct{ Value *bool }
+
+func (w WithEnableSmokeTest) ConfigurePhaseRequestParameters(c *PhaseRequestParametersConfig) {
+	c.EnableSmokeTest = w.Value
 }
 
 type WithSize struct{ Value *string }

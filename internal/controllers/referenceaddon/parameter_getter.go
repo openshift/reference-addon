@@ -34,6 +34,7 @@ type SecretParameterGetter struct {
 
 const (
 	applyNetworkPoliciesID = "applynetworkpolicies"
+	enableSmokeTestID      = "enablesmoketest"
 	sizeParameterID        = "size"
 )
 
@@ -61,6 +62,15 @@ func (s *SecretParameterGetter) GetParameters(ctx context.Context) (PhaseRequest
 		}
 
 		opts = append(opts, WithApplyNetworkPolicies{Value: &b})
+	}
+
+	if val, ok := secret.Data[enableSmokeTestID]; ok {
+		b, err := parseBool(string(val))
+		if err != nil {
+			return NewPhaseRequestParameters(), fmt.Errorf("parsing 'EnableSmokeTest' value: %w", err)
+		}
+
+		opts = append(opts, WithEnableSmokeTest{Value: &b})
 	}
 
 	if val, ok := secret.Data[sizeParameterID]; ok {

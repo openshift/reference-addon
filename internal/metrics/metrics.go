@@ -17,25 +17,37 @@ func RegisterMetrics(reg prometheus.Registerer) error {
 		return fmt.Errorf("registering 'responseTime' metric: %w", err)
 	}
 
+	if err := reg.Register(smokeTest); err != nil {
+		return fmt.Errorf("registering 'smokeTest' metric: %w", err)
+	}
+
 	return nil
 }
 
 var (
 	availability = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "reference_addon_sample_availability",
+			Name: metricPrefix + "sample_availability",
 			Help: "external url availability 0-not available and 1-available.",
 		},
 		[]string{"url"},
 	)
 	responseTime = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "reference_addon_sample_response_time",
+			Name: metricPrefix + "sample_response_time",
 			Help: "external url response time taken.",
 		},
 		[]string{"url"},
 	)
+	smokeTest = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: metricPrefix + "smoke_test",
+			Help: "smoke test for testing end-to-end metrics flow",
+		},
+	)
 )
+
+const metricPrefix = "reference_addon_"
 
 func NewResponseSamplerImpl() *ResponseSamplerImpl {
 	return &ResponseSamplerImpl{}
@@ -68,4 +80,18 @@ func callExternalURL(externalURL string) (float64, float64) {
 	}
 
 	return float64(status), float64(time.Since(start).Milliseconds())
+}
+
+func NewSmokeTester() *SmokeTester {
+	return &SmokeTester{}
+}
+
+type SmokeTester struct{}
+
+func (t *SmokeTester) Enable() {
+	smokeTest.Set(1)
+}
+
+func (t *SmokeTester) Disable() {
+	smokeTest.Set(0)
 }

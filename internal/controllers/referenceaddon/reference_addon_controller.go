@@ -42,6 +42,7 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 	var (
 		phaseLog                     = cfg.Log.WithName("phase")
 		phaseApplyNetworkPoliciesLog = phaseLog.WithName("applyNetworkPolicies")
+		PhaseSmokeTestRunLog         = phaseLog.WithName("smokeTestRun")
 		phaseUninstallLog            = phaseLog.WithName("uninstall")
 		uninstallerLog               = phaseUninstallLog.WithName("uninstaller")
 	)
@@ -63,6 +64,12 @@ func NewReferenceAddonReconciler(client client.Client, getter ParameterGetter, o
 				WithLog{Log: phaseUninstallLog},
 				WithAddonNamespace(cfg.AddonNamespace),
 				WithOperatorName(cfg.OperatorName),
+			),
+			NewPhaseSmokeTestRun(
+				WithLog{Log: PhaseSmokeTestRunLog},
+				WithSmokeTester{
+					Tester: metrics.NewSmokeTester(),
+				},
 			),
 			NewPhaseSendDummyMetrics(
 				metrics.NewResponseSamplerImpl(),

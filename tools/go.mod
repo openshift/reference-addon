@@ -7,7 +7,7 @@ require (
 	github.com/mikefarah/yq/v4 v4.34.1
 	github.com/onsi/ginkgo/v2 v2.10.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf
-	sigs.k8s.io/controller-tools v0.12.0
+	sigs.k8s.io/controller-tools v0.12.1
 	sigs.k8s.io/kustomize/kustomize/v4 v4.5.7
 )
 

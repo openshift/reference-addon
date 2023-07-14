@@ -11,8 +11,13 @@ replacements:
     select:
       name: reference-addon.v0.0.0
 patchesStrategicMerge:
-  - ./cluster_service_version_patch.yaml
+- ./cluster_service_version_patch.yaml
+- ./deployment_patch.yaml
 resources:
 - ../../deploy
 components:
 - ../../components/olm
+images:
+- digest: sha256:128a542e1ce40ba0682716c642d2d6b6526d94d6a099c9b99cae33a31d806b21
+  name: metrics-proxy
+  newName: registry.redhat.io/openshift4/ose-kube-rbac-proxy

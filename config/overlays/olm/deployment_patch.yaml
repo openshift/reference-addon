@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operator
+spec:
+  selector:
+  metadata:
+  template:
+    spec:
+      containers:
+      - name: metrics-proxy
+        image: metrics-proxy
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics-proxy
+          containerPort: 8443
+        args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --ignore-paths=/metrics,/healthz
+        - --tls-cert-file=/etc/tls/private/tls.crt
+        - --tls-private-key-file=/etc/tls/private/tls.key
+        - --proxy-endpoints-port=8643
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: metrics-proxy-tls
+        livenessProbe:
+          httpGet:
+            path: healthz
+            port: 8643
+            scheme: HTTPS
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: healthz
+            port: 8643
+            scheme: HTTPS
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: metrics-proxy-tls
+        secret:
+          secretName: metrics-proxy-tls

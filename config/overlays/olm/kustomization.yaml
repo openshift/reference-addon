@@ -15,6 +15,7 @@ patchesStrategicMerge:
 - ./deployment_patch.yaml
 resources:
 - ../../deploy
+- ./metrics.service.yaml
 components:
 - ../../components/olm
 images:

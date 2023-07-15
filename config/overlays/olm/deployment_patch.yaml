@@ -23,6 +23,13 @@ spec:
         volumeMounts:
         - mountPath: /etc/tls/private
           name: metrics-proxy-tls
+        resources:
+          limits:
+            cpu: 100m
+            memory: 64Mi
+          requests:
+            cpu: 25m
+            memory: 32Mi
         livenessProbe:
           httpGet:
             path: healthz

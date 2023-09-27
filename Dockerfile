@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12 AS builder
+FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.20-openshift-4.14 AS builder
 
 WORKDIR /workspace
 

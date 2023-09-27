@@ -235,7 +235,7 @@ func (Deps) UpdateGolangCILint(ctx context.Context) {
 func (Deps) UpdateKustomize(ctx context.Context) {
 	mg.CtxDeps(
 		ctx,
-		mg.F(updateGODependency, "sigs.k8s.io/kustomize/kustomize/v4"),
+		mg.F(updateGODependency, "sigs.k8s.io/kustomize/kustomize/v5"),
 	)
 }
 

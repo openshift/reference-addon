@@ -8,9 +8,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/go-logr/logr"
 	av1alpha1 "github.com/openshift/addon-operator/apis/addons/v1alpha1"
@@ -82,14 +84,19 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 	}
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                     scheme,
-		MetricsBindAddress:         opts.MetricsAddr,
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				opts.Namespace: {},
+			},
+		},
 		HealthProbeBindAddress:     opts.ProbeAddr,
-		Port:                       9443,
 		LeaderElectionResourceLock: "leases",
 		LeaderElection:             opts.EnableLeaderElection,
 		LeaderElectionID:           "8a4hp84a6s.addon-operator-lock",
-		Namespace:                  opts.Namespace,
+		Metrics: server.Options{
+			BindAddress: opts.MetricsAddr,
+		},
+		Scheme: scheme,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("initializing manager: %w", err)

@@ -11,7 +11,7 @@ require (
 	github.com/openshift/addon-operator v1.12.0
 	github.com/openshift/addon-operator/apis v0.0.0-20230505081548-bce54f373482
 	github.com/operator-framework/api v0.17.7
-	github.com/otiai10/copy v1.11.0
+	github.com/otiai10/copy v1.12.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0

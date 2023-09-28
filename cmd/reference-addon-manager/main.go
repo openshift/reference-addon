@@ -93,10 +93,8 @@ func setupManager(log logr.Logger, opts options) (ctrl.Manager, error) {
 		LeaderElectionResourceLock: "leases",
 		LeaderElection:             opts.EnableLeaderElection,
 		LeaderElectionID:           "8a4hp84a6s.addon-operator-lock",
-		Metrics: server.Options{
-			BindAddress: opts.MetricsAddr,
-		},
-		Scheme: scheme,
+		Metrics:                    getMetricsOpts(opts),
+		Scheme:                     scheme,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("initializing manager: %w", err)
@@ -186,6 +184,19 @@ func initializeScheme() (*runtime.Scheme, error) {
 	}
 
 	return scheme, nil
+}
+
+func getMetricsOpts(opts options) server.Options {
+	metricsOpts := server.Options{
+		BindAddress: opts.MetricsAddr,
+	}
+
+	if opts.MetricsCertDir != "" {
+		metricsOpts.SecureServing = true
+		metricsOpts.CertDir = opts.MetricsCertDir
+	}
+
+	return metricsOpts
 }
 
 func fail(log logr.Logger, err error, msg string) {

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -15,6 +16,7 @@ type options struct {
 	EnableLeaderElection   bool
 	EnableMetricsRecorder  bool
 	MetricsAddr            string
+	MetricsCertDir         string
 	Namespace              string
 	OperatorName           string
 	ParameterSecretname    string
@@ -64,6 +66,16 @@ func (o *options) processFlags() {
 		"metrics-addr",
 		o.MetricsAddr,
 		"The address the metric endpoint binds to.",
+	)
+
+	flags.StringVar(
+		&o.MetricsCertDir,
+		"metrics-cert-dir",
+		o.MetricsCertDir,
+		strings.Join([]string{
+			"The directory containing the TLS certificate (tls.crt) and key (tls.key) for secure metrics serviing.",
+			"If unset metrics will be served without TLS.",
+		}, " "),
 	)
 
 	flags.StringVar(

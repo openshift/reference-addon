@@ -6,50 +6,18 @@ spec:
   template:
     spec:
       containers:
-      - name: metrics-proxy
-        image: metrics-proxy
-        imagePullPolicy: IfNotPresent
+      - name: manager
         ports:
-        - name: metrics-proxy
+        - name: tls-manager-metrics
           containerPort: 8443
         args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:8080/
-        - --logtostderr=true
-        - --ignore-paths=/metrics,/healthz
-        - --tls-cert-file=/etc/tls/private/tls.crt
-        - --tls-private-key-file=/etc/tls/private/tls.key
-        - --proxy-endpoints-port=8643
+        - --enable-leader-election
+        - --metrics-addr=:8443
+        - --metrics-cert-dir=/etc/tls/manager/metrics
         volumeMounts:
-        - mountPath: /etc/tls/private
-          name: metrics-proxy-tls
-        resources:
-          limits:
-            cpu: 100m
-            memory: 64Mi
-          requests:
-            cpu: 25m
-            memory: 32Mi
-        livenessProbe:
-          httpGet:
-            path: healthz
-            port: 8643
-            scheme: HTTPS
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: healthz
-            port: 8643
-            scheme: HTTPS
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
+        - mountPath: /etc/tls/manager/metrics
+          name: tls-manager-metrics
       volumes:
-      - name: metrics-proxy-tls
+      - name: tls-manager-metrics
         secret:
-          secretName: metrics-proxy-tls
+          secretName: tls-manager-metrics

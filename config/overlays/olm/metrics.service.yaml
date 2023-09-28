@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: reference-addon-metrics
   annotations:
-    service.beta.openshift.io/serving-cert-secret-name: metrics-proxy-tls
+    service.beta.openshift.io/serving-cert-secret-name: tls-manager-metrics
   labels:
     app.kubernetes.io/name: reference-addon-operator
 spec:

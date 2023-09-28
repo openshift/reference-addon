@@ -4,6 +4,7 @@ namePrefix: reference-addon-
 commonLabels:
   app.kubernetes.io/name: reference-addon-operator
 resources:
+- reference.addons.managed.openshift.io_referenceaddons.yaml
 - deployment.yaml
 - role_binding.yaml
 - role.yaml

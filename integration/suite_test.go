@@ -76,7 +76,7 @@ var _ = BeforeSuite(func() {
 		},
 		Paths: []string{
 			filepath.Join(root, "config", "deploy", "reference.addons.managed.openshift.io_referenceaddons.yaml"),
-			filepath.Join(root, "config", "deploy", "addons.managed.openshift.io_addoninstances.yaml"),
+			filepath.Join(root, "config", "overlays", "dev", "00_addons.managed.openshift.io_addoninstances.yaml"),
 		},
 		Scheme: scheme,
 	})

@@ -7,7 +7,7 @@ require (
 	github.com/magefile/mage v1.15.0
 	github.com/mt-sre/go-ci v0.6.5
 	github.com/onsi/ginkgo/v2 v2.12.1
-	github.com/onsi/gomega v1.27.10
+	github.com/onsi/gomega v1.28.0
 	github.com/openshift/addon-operator v1.13.6
 	github.com/openshift/addon-operator/apis v0.0.0-20230706051718-4032d89c8b54
 	github.com/operator-framework/api v0.17.7

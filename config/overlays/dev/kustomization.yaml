@@ -7,4 +7,5 @@ images:
   newTag: latest
 resources:
 - ./00_namespace.yaml
+- ./00_addons.managed.openshift.io_addoninstances.yaml
 - ../../deploy

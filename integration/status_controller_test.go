@@ -49,6 +49,8 @@ var _ = Describe("Status Controller", func() {
 			"-operator-name", operatorName,
 			"-kubeconfig", _kubeConfigPath,
 			"-heartbeat-interval", heartbeatInterval.String(),
+			"-health-probe-bind-address", "0",
+			"-metrics-addr", "0",
 		)
 
 		session, err := Start(manager, GinkgoWriter, GinkgoWriter)

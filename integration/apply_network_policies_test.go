@@ -45,6 +45,8 @@ var _ = Describe("Apply Network Policies Phase", func() {
 			"-operator-name", operatorName,
 			"-parameter-secret-name", parameterSecretName,
 			"-kubeconfig", _kubeConfigPath,
+			"-health-probe-bind-address", "0",
+			"-metrics-addr", "0",
 		)
 
 		session, err := Start(manager, GinkgoWriter, GinkgoWriter)

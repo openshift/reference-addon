@@ -26,7 +26,7 @@ import (
 type StatusControllerReconciler struct {
 	cfg                 StatusControllerReconcilerConfig
 	client              client.Client
-	addonInstanceClient *addoninstance.AddonInstanceClientImpl
+	addonInstanceClient addoninstance.AddonInstanceClient
 }
 
 // Grabbing namespace/name needs to be an option

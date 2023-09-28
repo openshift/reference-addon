@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.12.1
 	github.com/onsi/gomega v1.27.10
 	github.com/openshift/addon-operator v1.13.6
-	github.com/openshift/addon-operator/apis v0.0.0-20230505081548-bce54f373482
+	github.com/openshift/addon-operator/apis v0.0.0-20230706051718-4032d89c8b54
 	github.com/operator-framework/api v0.17.7
 	github.com/otiai10/copy v1.12.0
 	github.com/prometheus/client_golang v1.17.0

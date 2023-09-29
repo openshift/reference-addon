@@ -8,7 +8,7 @@ spec:
       containers:
       - name: manager
         ports:
-        - name: tls-manager-metrics
+        - name: tls-metrics
           containerPort: 8443
         args:
         - --enable-leader-election

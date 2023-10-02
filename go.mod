@@ -11,7 +11,7 @@ require (
 	github.com/openshift/addon-operator v1.13.6
 	github.com/openshift/addon-operator/apis v0.0.0-20230706051718-4032d89c8b54
 	github.com/operator-framework/api v0.17.7
-	github.com/otiai10/copy v1.12.0
+	github.com/otiai10/copy v1.14.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
@@ -67,6 +67,7 @@ require (
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect

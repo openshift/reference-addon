@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/golangci/golangci-lint v1.54.2
 	github.com/mikefarah/yq/v4 v4.35.2
-	github.com/onsi/ginkgo/v2 v2.12.1
+	github.com/onsi/ginkgo/v2 v2.13.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf
 	sigs.k8s.io/controller-tools v0.13.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.1.1

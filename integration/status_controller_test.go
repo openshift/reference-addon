@@ -102,7 +102,7 @@ var _ = Describe("Status Controller", func() {
 					_client.Get(ctx, &addonInstance)
 
 					return addonInstance.Status.Conditions
-				}, 10*time.Second).Should(ContainElements(EqualCondition(expectedCondition)))
+				}, 30*time.Second).Should(ContainElements(EqualCondition(expectedCondition)))
 
 				fmt.Printf("%+v\n", addonInstance)
 

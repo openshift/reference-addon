@@ -3,7 +3,7 @@ module github.com/openshift/reference-addon
 go 1.20
 
 require (
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.3.0
 	github.com/magefile/mage v1.15.0
 	github.com/mt-sre/go-ci v0.6.7
 	github.com/onsi/ginkgo/v2 v2.13.0

@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v1.3.0
 	github.com/magefile/mage v1.15.0
 	github.com/mt-sre/go-ci v0.6.7
-	github.com/onsi/ginkgo/v2 v2.13.1
+	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
 	github.com/openshift/addon-operator v1.14.0
 	github.com/openshift/addon-operator/apis v0.0.0-20230908020307-fe70c681ed8b

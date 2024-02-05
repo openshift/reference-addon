@@ -12,7 +12,7 @@ require (
 	github.com/onsi/gomega v1.31.1
 	github.com/openshift/addon-operator v1.14.0
 	github.com/openshift/addon-operator/apis v0.0.0-20230908020307-fe70c681ed8b
-	github.com/operator-framework/api v0.21.0
+	github.com/operator-framework/api v0.22.0
 	github.com/otiai10/copy v1.14.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/stretchr/testify v1.8.4

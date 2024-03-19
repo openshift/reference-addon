@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/golangci/golangci-lint v1.56.2
 	github.com/mikefarah/yq/v4 v4.42.1
-	github.com/onsi/ginkgo/v2 v2.16.0
+	github.com/onsi/ginkgo/v2 v2.17.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf
 	sigs.k8s.io/controller-tools v0.14.0
 	sigs.k8s.io/kustomize/kustomize/v5 v5.3.0

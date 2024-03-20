@@ -7,7 +7,7 @@ toolchain go1.21.3
 require (
 	github.com/go-logr/logr v1.4.1
 	github.com/magefile/mage v1.15.0
-	github.com/mt-sre/go-ci v0.6.7
+	github.com/mt-sre/go-ci v0.6.8
 	github.com/onsi/ginkgo/v2 v2.17.0
 	github.com/onsi/gomega v1.32.0
 	github.com/openshift/addon-operator v1.14.0

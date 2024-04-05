@@ -8,7 +8,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.17.1
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20220927155351-7399a3a595bf
 	sigs.k8s.io/controller-tools v0.14.0
-	sigs.k8s.io/kustomize/kustomize/v5 v5.4.0
+	sigs.k8s.io/kustomize/kustomize/v5 v5.4.1
 )
 
 require (
@@ -231,7 +231,7 @@ require (
 	mvdan.cc/gofumpt v0.6.0 // indirect
 	mvdan.cc/unparam v0.0.0-20240104100049-c549a3470d14 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
-	sigs.k8s.io/kustomize/api v0.17.0 // indirect
+	sigs.k8s.io/kustomize/api v0.17.1 // indirect
 	sigs.k8s.io/kustomize/cmd/config v0.14.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect

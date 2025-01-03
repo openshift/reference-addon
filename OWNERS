@@ -1,10 +1,5 @@
 approvers:
-- thetechnick
-- apahim
-- aditya-konarde
 - ajpantuso
-- npecka
 options: {}
 reviewers:
 - ajpantuso
-- npecka

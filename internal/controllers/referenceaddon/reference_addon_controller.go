@@ -7,11 +7,13 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	refv1alpha1 "github.com/openshift/reference-addon/apis/reference/v1alpha1"
 	"github.com/openshift/reference-addon/internal/controllers"
@@ -195,10 +197,13 @@ func (r *ReferenceAddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&refv1alpha1.ReferenceAddon{}).
-		WatchesRawSource(
-			controllers.EnqueueObject(requestObject),
-			refAddonHandler,
-		).
+		WatchesRawSource(source.Func(func(_ context.Context, q workqueue.TypedRateLimitingInterface[reconcile.Request]) error {
+			q.Add(reconcile.Request{
+				NamespacedName: requestObject,
+			})
+
+			return nil
+		})).
 		Owns(
 			&netv1.NetworkPolicy{},
 			builder.WithPredicates(controllers.HasName(generateIngressPolicyName(r.cfg.OperatorName))),

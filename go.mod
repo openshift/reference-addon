@@ -12,7 +12,7 @@ require (
 	github.com/openshift/addon-operator/apis v0.0.0-20231110045543-dd01f2f5c184
 	github.com/operator-framework/api v0.27.0
 	github.com/otiai10/copy v1.14.0
-	github.com/prometheus/client_golang v1.19.1
+	github.com/prometheus/client_golang v1.20.5
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -48,6 +48,7 @@ require (
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

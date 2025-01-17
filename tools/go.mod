@@ -7,7 +7,7 @@ require (
 	github.com/mikefarah/yq/v4 v4.45.1
 	github.com/onsi/ginkgo/v2 v2.22.2
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250103111815-1ac370e560b1
-	sigs.k8s.io/controller-tools v0.17.0
+	sigs.k8s.io/controller-tools v0.17.1
 	sigs.k8s.io/kustomize/kustomize/v5 v5.6.0
 )
 
@@ -219,11 +219,11 @@ require (
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/tools v0.28.0 // indirect
+	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

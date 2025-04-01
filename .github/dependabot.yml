@@ -2,6 +2,11 @@ version: 2
 updates:
 - package-ecosystem: gomod
   directory: /
+  groups:
+    kube:
+      applies-to: version-updates
+      patterns:
+      - k8s.io/*
   schedule:
     interval: daily
   labels:
@@ -11,6 +16,11 @@ updates:
     include: scope
 - package-ecosystem: gomod
   directory: /tools
+  groups:
+    kube:
+      applies-to: version-updates
+      patterns:
+      - k8s.io/*
   schedule:
     interval: daily
   labels:

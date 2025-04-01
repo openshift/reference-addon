@@ -1,26 +1,18 @@
 version: 2
 updates:
 - package-ecosystem: gomod
-  directory: /
+  directories:
+  - '/'
+  - '/tools'
   groups:
     kube:
       applies-to: version-updates
       patterns:
       - k8s.io/*
-  schedule:
-    interval: daily
-  labels:
-  - kind/deps
-  commit-message:
-    prefix: fix
-    include: scope
-- package-ecosystem: gomod
-  directory: /tools
-  groups:
-    kube:
+    onsi:
       applies-to: version-updates
       patterns:
-      - k8s.io/*
+      - github.com/onsi/*
   schedule:
     interval: daily
   labels:

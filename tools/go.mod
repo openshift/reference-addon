@@ -2,6 +2,8 @@ module tools
 
 go 1.23.0
 
+toolchain go1.24.1
+
 require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/mikefarah/yq/v4 v4.45.1
@@ -229,9 +231,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.6.1 // indirect
-	k8s.io/api v0.32.1 // indirect
-	k8s.io/apiextensions-apiserver v0.32.1 // indirect
-	k8s.io/apimachinery v0.32.1 // indirect
+	k8s.io/api v0.32.3 // indirect
+	k8s.io/apiextensions-apiserver v0.32.3 // indirect
+	k8s.io/apimachinery v0.32.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect

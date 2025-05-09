@@ -1,10 +1,10 @@
 module tools
 
-go 1.23.0
+go 1.24
 
 require (
 	github.com/golangci/golangci-lint v1.64.8
-	github.com/mikefarah/yq/v4 v4.45.1
+	github.com/mikefarah/yq/v4 v4.45.3
 	github.com/onsi/ginkgo/v2 v2.22.2
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250103111815-1ac370e560b1
 	sigs.k8s.io/controller-tools v0.17.2
@@ -25,9 +25,9 @@ require (
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.3.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.1 // indirect
-	github.com/a8m/envsubst v1.4.2 // indirect
+	github.com/a8m/envsubst v1.4.3 // indirect
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
-	github.com/alecthomas/participle/v2 v2.1.1 // indirect
+	github.com/alecthomas/participle/v2 v2.1.4 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.5 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
 	github.com/alingse/asasalint v0.0.11 // indirect
@@ -54,7 +54,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
-	github.com/elliotchance/orderedmap v1.7.1 // indirect
+	github.com/elliotchance/orderedmap v1.8.0 // indirect
 	github.com/ettle/strcase v0.2.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
@@ -82,8 +82,8 @@ require (
 	github.com/go-xmlfmt/xmlfmt v1.1.3 // indirect
 	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
-	github.com/goccy/go-json v0.10.4 // indirect
-	github.com/goccy/go-yaml v1.13.3 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/goccy/go-yaml v1.17.1 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golangci/dupl v0.0.0-20250308024227-f665c8d69b32 // indirect
@@ -129,7 +129,7 @@ require (
 	github.com/ldez/usetesting v0.4.2 // indirect
 	github.com/leonklingele/grouper v1.1.2 // indirect
 	github.com/macabu/inamedparam v0.1.3 // indirect
-	github.com/magiconair/properties v1.8.9 // indirect
+	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/maratori/testableexamples v1.0.0 // indirect
 	github.com/maratori/testpackage v1.1.1 // indirect
@@ -151,7 +151,7 @@ require (
 	github.com/nunnatsa/ginkgolinter v0.19.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/polyfloyd/go-errorlint v1.7.1 // indirect
@@ -216,10 +216,10 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
 	golang.org/x/mod v0.24.0 // indirect
-	golang.org/x/net v0.37.0 // indirect
-	golang.org/x/sync v0.12.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/tools v0.31.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect

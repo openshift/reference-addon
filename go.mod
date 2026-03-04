@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.23.4
 
 require (
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/magefile/mage v1.15.0
 	github.com/mt-sre/go-ci v0.6.10
 	github.com/onsi/ginkgo/v2 v2.22.2
